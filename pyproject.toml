@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "conveyor"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch"
+]
