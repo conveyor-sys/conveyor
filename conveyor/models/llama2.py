@@ -1,5 +1,5 @@
 # Adapted from
-# https://github.com/vllm-project/vllm/blob/671af2b1c0b3ed6d856d37c21a561cc429a10701/vllm/model_executor/models/llama.py#L1
+# https://github.com/sgl-project/sglang/blob/63ba630bbbb2d55787ac54ac0a01cbde993afc20/python/sglang/srt/models/llama2.py
 """Inference-only LLaMA model compatible with HuggingFace weights."""
 from typing import Any, Dict, Optional, Tuple
 

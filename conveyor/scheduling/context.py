@@ -20,6 +20,10 @@ class InferenceState(Enum):
 @dataclass
 class InferenceContext:
     state: InferenceState
+
+    # Inference state
+
+    # KV cache
     kv_indptr: torch.Tensor
     kv_page_indices: torch.Tensor
     kv_last_page_lens: torch.Tensor
@@ -29,5 +33,4 @@ class InferenceContext:
 
     @classmethod
     def new(self, state: InferenceState, config: PretrainedConfig) -> InferenceContext:
-
         pass
