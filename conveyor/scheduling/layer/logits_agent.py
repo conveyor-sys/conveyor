@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from conveyor.schduling.context import InferenceContext
+from conveyor.scheduling.context import InferenceContext
 
 
 class LogitsAgent(nn.Module):

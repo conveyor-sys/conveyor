@@ -3,6 +3,11 @@ from enum import Enum
 
 from attr import dataclass
 import torch
+from flashinfer import (
+    BatchDecodeWithPagedKVCacheWrapper,
+    BatchPrefillWithPagedKVCacheWrapper,
+)
+from transformers import PretrainedConfig
 
 
 class InferenceState(Enum):
@@ -19,7 +24,10 @@ class InferenceContext:
     kv_page_indices: torch.Tensor
     kv_last_page_lens: torch.Tensor
     qo_indptr: torch.Tensor
+    prefill_wrapper: BatchPrefillWithPagedKVCacheWrapper
+    decode_wrapper: BatchDecodeWithPagedKVCacheWrapper
 
     @classmethod
-    def new(self, state: InferenceState) -> InferenceContext:
+    def new(self, state: InferenceState, config: PretrainedConfig) -> InferenceContext:
+
         pass

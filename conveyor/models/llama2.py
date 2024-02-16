@@ -1,7 +1,7 @@
 # Adapted from
 # https://github.com/vllm-project/vllm/blob/671af2b1c0b3ed6d856d37c21a561cc429a10701/vllm/model_executor/models/llama.py#L1
 """Inference-only LLaMA model compatible with HuggingFace weights."""
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 
@@ -28,8 +28,9 @@ from vllm.model_executor.weight_utils import (
     hf_model_weights_iterator,
 )
 
-from conveyor.schduling.context import InferenceContext
-from conveyor.schduling.layer.logits_agent import LogitsAgent
+from conveyor.scheduling.context import InferenceContext
+from conveyor.scheduling.layer.logits_agent import LogitsAgent
+from conveyor.scheduling.layer.hook_attention import HookAttention
 
 
 class LlamaMLP(nn.Module):
@@ -121,8 +122,7 @@ class LlamaAttention(nn.Module):
             base=rope_theta,
             rope_scaling=rope_scaling,
         )
-        raise NotImplementedError("not implemented yet.")
-        self.attn = Attention(
+        self.attn = HookAttention(
             self.num_heads,
             self.head_dim,
             self.scaling,
