@@ -1,3 +1,4 @@
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -5,7 +6,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "conveyor"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "torch"
-]
+dependencies = ["torch", "flashinfer", "outlines", "vllm"]
+
+[tool.black]
+line-length = 88
+target-version = ['py36', 'py37', 'py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest]
+testpaths = ["test"]
