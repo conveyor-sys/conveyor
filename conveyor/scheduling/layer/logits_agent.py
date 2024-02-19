@@ -24,9 +24,15 @@ class LogitsAgent(nn.Module):
     ):
         # TODO: log probability?
         if context.state == InferenceState.DECODE:
-            logits = weight.matmul(hidden_states)
-            if self.tensor_parallel_size > 1:
-                logits = tensor_model_parallel_all_gather(logits)
-            return logits[:, :, self.config.vocab_size], (None, None, None)
+            last_hidden = hidden_states
         else:
-            raise NotImplementedError
+            last_index = (
+                torch.cumsum(context.seq_lens - context.filling_start_offset, dim=0) - 1
+            )
+            last_hidden = hidden_states[last_index]
+            hidden_states = None
+
+        logits = torch.matmul(last_hidden, weight.T)
+        if self.tensor_parallel_size > 1:
+            logits = tensor_model_parallel_all_gather(logits)
+        return logits[:, : self.config.vocab_size], (None, None, None)
