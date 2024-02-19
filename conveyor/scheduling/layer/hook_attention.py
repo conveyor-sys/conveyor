@@ -3,6 +3,7 @@ import logging
 from torch import nn
 
 from conveyor.scheduling.context import InferenceContext, InferenceState
+import flashinfer
 
 logging = logging.getLogger(__name__)
 
@@ -47,7 +48,8 @@ class HookAttention(nn.Module):
         self.store_kv_cache(k, v, context)
         output: torch.Tensor = context.prefill_wrapper.forward(
             q.contiguous().view(-1, self.num_q_heads, self.head_dim),
-            # TODO
+            context.cache_manager.kv_storage[self.layer_id],
+            True,
         )
         return output.view(-1, self.num_q_heads * self.head_dim)
 
@@ -61,14 +63,20 @@ class HookAttention(nn.Module):
         self.store_kv_cache(k, v, context)
         output: torch.Tensor = context.decode_wrapper.forward(
             q.contiguous().view(-1, self.num_q_heads, self.head_dim),
-            # TODO
+            context.cache_manager.kv_storage[self.layer_id],
         )
         return output.view(-1, self.num_q_heads * self.head_dim)
 
     def store_kv_cache(
         self, k_cache: torch.Tensor, v_cache: torch.Tensor, context: InferenceContext
     ):
-        key_buf = context.cache_manager.get_key_storage(self.layer_id)
-        value_buf = context.cache_manager.get_value_storage(self.layer_id)
-        kv_len = k_cache.size(0)
-        raise NotImplementedError
+        kv_data = context.cache_manager.kv_storage[self.layer_id]
+        flashinfer.append_paged_kv_cache(
+            k_cache,
+            v_cache,
+            context.qo_indptr,
+            kv_data,
+            context.kv_page_indices,
+            context.kv_indptr,
+            context.kv_last_page_lens,
+        )

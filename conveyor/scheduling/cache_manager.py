@@ -36,18 +36,12 @@ class CacheManager:
         self.page_state = torch.zeros((page_num,), dtype=torch.bool, device=device)
         self.kv_storage = [
             torch.empty(
-                (page_num * page_size, 2, head_num, head_dim),
+                (page_num, 2, page_size, head_num, head_dim),
                 dtype=dtype,
                 device=device,
             )
             for _ in range(layer_num)
         ]
-
-    def get_key_storage(self, layer_id: int) -> torch.Tensor:
-        return self.kv_storage[layer_id][:, 0]
-
-    def get_value_storage(self, layer_id: int) -> torch.Tensor:
-        return self.kv_storage[layer_id][:, 1]
 
     def alloc_new_reqs(self, num_reqs) -> Optional[torch.Tensor]:
         if self.free_req_slots < num_reqs:

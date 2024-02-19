@@ -29,7 +29,7 @@ class InferenceContext:
     # Inference state
     req_ids: torch.Tensor
     seq_lens: torch.Tensor
-    prefix_lens: torch.Tensor
+    filling_start_offset: torch.Tensor
 
     # KV cache
     cache_manager: CacheManager
@@ -48,7 +48,7 @@ class InferenceContext:
         cache_manager: CacheManager,
         req_ids: torch.Tensor,
         seq_lens: torch.Tensor,
-        prefix_lens: torch.Tensor,
+        filling_start_offset: torch.Tensor,
     ) -> InferenceContext:
         batch_size = req_ids.size(0)
         # KV cache
@@ -66,28 +66,32 @@ class InferenceContext:
             dim=0,
         ).contiguous()
         kv_last_page_lens = torch.remainder(seq_lens, cache_manager.page_size) + 1
+        workspace_buffer = torch.empty(
+            32 * 1024 * 1024, dtype=torch.int8, device="cuda"
+        )
+        qo_indptr = torch.zeros(
+            (batch_size + 1,), dtype=torch.int32, device=config.device
+        )
+        qo_indptr[1:] = (seq_lens - filling_start_offset).cumsum(dim=0)
 
-        # TODO: end_forward
         match state:
             case InferenceState.PREFILL | InferenceState.APPEND:
-                qo_indptr = torch.zeros(
-                    (batch_size + 1,), dtype=torch.int32, device=config.device
-                )
-                qo_indptr[1:] = (seq_lens - prefix_lens).cumsum(dim=0)
-                prefill_wrapper = BatchPrefillWithPagedKVCacheWrapper()
+                prefill_wrapper = BatchPrefillWithPagedKVCacheWrapper(workspace_buffer)
                 prefill_wrapper.begin_forward(
                     qo_indptr,
-                    batch_size,
+                    kv_indptr,
+                    kv_page_index,
+                    kv_last_page_lens,
                     config.num_attention_heads,
                     config.num_key_value_heads,
                 )
                 decode_wrapper = None
             case _:
-                qo_indptr = None
                 prefill_wrapper = None
-                decode_wrapper = BatchDecodeWithPagedKVCacheWrapper()
+                decode_wrapper = BatchDecodeWithPagedKVCacheWrapper(workspace_buffer)
                 decode_wrapper.begin_forward(
                     kv_indptr,
+                    kv_page_index,
                     kv_last_page_lens,
                     batch_size,
                     config.num_attention_heads,
@@ -100,7 +104,7 @@ class InferenceContext:
             state=state,
             req_ids=req_ids,
             seq_lens=seq_lens,
-            prefix_lens=prefix_lens,
+            filling_start_offset=filling_start_offset,
             cache_manager=cache_manager,
             kv_indptr=kv_indptr,
             kv_page_indices=kv_page_index,
@@ -109,6 +113,14 @@ class InferenceContext:
             prefill_wrapper=prefill_wrapper,
             decode_wrapper=decode_wrapper,
         )
+
+    def drop(self) -> None:
+        if self.state in {InferenceState.PREFILL, InferenceState.APPEND}:
+            self.prefill_wrapper.end_forward()
+        else:
+            self.decode_wrapper.end_forward()
+        self.prefill_wrapper = None
+        self.decode_wrapper = None
 
 
 class RequestState(Enum):
