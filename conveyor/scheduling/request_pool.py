@@ -4,15 +4,15 @@ from enum import Enum
 from attr import dataclass
 import torch
 
-
-class Request:
-    def __init__(self, id, prefix: str):
-        self.id = id
-        self.content = prefix
-        # todo: tokenize content
-        raise NotImplementedError
+from conveyor.scheduling.context import RequestInfo
 
 
 class RequestPool:
     def __init__(self):
-        raise NotImplementedError
+        self.queued_requests = []
+
+    def add_request(self, req: RequestInfo):
+        self.queued_requests.append(req)
+
+    def pop_request(self) -> RequestInfo:
+        return self.queued_requests.pop(0)

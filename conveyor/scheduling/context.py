@@ -29,6 +29,7 @@ class InferenceContext:
     # Inference state
     req_ids: torch.Tensor
     seq_lens: torch.Tensor
+    # the start offset of token whose KV-cache have not been computed
     filling_start_offset: torch.Tensor
 
     # KV cache
@@ -134,5 +135,6 @@ class RequestInfo:
         self.req_id = req_id
         self.input_text = input_text
         self.tokenizer = tokenizer
+        self.tokens = tokenizer.encode(input_text)  # TODO: FIXME
         self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None
