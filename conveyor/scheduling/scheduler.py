@@ -7,11 +7,15 @@ from conveyor.models.config import ModelConfig
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
 from conveyor.scheduling.request_pool import RequestPool
+from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
 from transformers import PretrainedConfig
 import torch
 from torch import nn
 import conveyor
 import importlib
+import logging
+
+logging = logging.getLogger(__name__)
 
 
 @lru_cache()
@@ -21,6 +25,7 @@ def import_model_classes():
         module = importlib.import_module(f"conveyor.models.{module_path.stem}")
         if hasattr(module, "EntryClass"):
             model_arch_name_to_cls[module.EntryClass.__name__] = module.EntryClass
+    logging.debug(f"Loaded model classes: {model_arch_name_to_cls.keys()}")
     return model_arch_name_to_cls
 
 
@@ -58,6 +63,19 @@ def compute_page_needed(
 
 class ScheduleEngine:
     def __init__(self, config: ModelConfig):
+        nccl_port = 5000
+        tp_size = 1
+        tp_rank = 0
+        # init global context
+        torch.cuda.set_device(tp_rank)
+        torch.distributed.init_process_group(
+            backend="nccl",
+            world_size=tp_size,
+            rank=tp_rank,
+            init_method=f"tcp://127.0.0.1:{nccl_port}",
+        )
+
+        initialize_model_parallel(tensor_model_parallel_size=tp_size)
         self.config = config
         self.model = ScheduleEngine.load_model(config)
         self.cache_manager = CacheManager(256)  # TODO: FIXME
@@ -98,6 +116,9 @@ class ScheduleEngine:
             return model_class
 
         architectures = getattr(config.hf_config, "architectures", [])
+        logging.debug(
+            f"Loading model with architectures: {architectures}, config: {config.hf_config}"
+        )
         model_class = get_model_cls_by_arch_name(architectures)
 
         # Load weights

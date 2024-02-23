@@ -1,3 +1,4 @@
+from typing import Any, List
 from typing import Optional
 from transformers import AutoConfig
 
@@ -24,13 +25,19 @@ class ModelConfig:
         path: str,
         trust_remote_code: bool = True,
         revision: Optional[str] = None,
+        model_arch_override: Optional[List[str] | str] = None,
     ) -> None:
         self.path = path
         self.trust_remote_code = trust_remote_code
         self.revision = revision
         self.hf_config = AutoConfig.from_pretrained(
-            self.path, trust_remote_code, revision
+            self.path, trust_remote_code=trust_remote_code, revision=revision
         )
+        if model_arch_override is not None:
+            if isinstance(model_arch_override, str):
+                self.hf_config.architectures = [model_arch_override]
+            elif isinstance(model_arch_override, list):
+                self.hf_config.architectures = model_arch_override
 
         # Unify the config keys for hf_config
         self.context_len: int = get_context_length(self.hf_config)
