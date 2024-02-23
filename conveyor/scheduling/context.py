@@ -10,7 +10,7 @@ from flashinfer import (
     BatchDecodeWithPagedKVCacheWrapper,
     BatchPrefillWithPagedKVCacheWrapper,
 )
-from transformers import PretrainedConfig
+from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
 
@@ -45,7 +45,7 @@ class InferenceContext:
     def new(
         cls,
         state: InferenceState,
-        config: PretrainedConfig,
+        config: ModelConfig,
         cache_manager: CacheManager,
         req_ids: torch.Tensor,
         seq_lens: torch.Tensor,
@@ -53,9 +53,7 @@ class InferenceContext:
     ) -> InferenceContext:
         batch_size = req_ids.size(0)
         # KV cache
-        kv_indptr = torch.zeros(
-            (batch_size + 1,), dtype=torch.int32, device=config.device
-        )
+        kv_indptr = torch.zeros((batch_size + 1,), dtype=torch.int32, device="cuda")
         kv_indptr[1:] = seq_lens.cumsum(dim=0)
         kv_page_index = torch.cat(
             [
@@ -134,7 +132,6 @@ class RequestInfo:
     def __init__(self, req_id: int, input_text: str, tokenizer, state: RequestState):
         self.req_id = req_id
         self.input_text = input_text
-        self.tokenizer = tokenizer
         self.tokens = tokenizer.encode(input_text)  # TODO: FIXME
         self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None

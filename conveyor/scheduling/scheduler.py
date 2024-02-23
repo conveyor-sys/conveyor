@@ -3,6 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Tuple
 from attr import dataclass
+from conveyor.models.config import ModelConfig
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
 from conveyor.scheduling.request_pool import RequestPool
@@ -56,7 +57,7 @@ def compute_page_needed(
 
 
 class ScheduleEngine:
-    def __init__(self, config: PretrainedConfig):
+    def __init__(self, config: ModelConfig):
         self.config = config
         self.model = ScheduleEngine.load_model(config)
         self.cache_manager = CacheManager(256)  # TODO: FIXME
