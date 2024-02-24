@@ -40,8 +40,20 @@ class SchedulerContext:
     completed_lens: torch.Tensor
 
     @classmethod
-    def new() -> SchedulerContext:
-        raise NotImplementedError
+    def new(
+        cls,
+        reqs: list[RequestInfo],
+        cache_manager: CacheManager,
+        seq_lens: torch.Tensor,
+        completed_lens: torch.Tensor,
+    ) -> SchedulerContext:
+        return cls(
+            requests=reqs,
+            pending_requests=[],
+            cache_manager=cache_manager,
+            seq_lens=seq_lens,
+            completed_lens=completed_lens,
+        )
 
     def add_active_request(self, req: RequestInfo) -> None:
         self.requests.append(req)
@@ -74,14 +86,44 @@ class ScheduleEngine:
             rank=tp_rank,
             init_method=f"tcp://127.0.0.1:{nccl_port}",
         )
-
         initialize_model_parallel(tensor_model_parallel_size=tp_size)
+
+        page_size = 8
+        max_request = 32
+        page_num = 2048
+        total_memory_usage_gb = (
+            config.num_hidden_layers
+            * page_num
+            * page_size
+            * config.num_attention_heads
+            * config.head_dim
+            * 2
+            / 1024
+            / 1024
+            / 1024
+        )
+        logging.info(
+            f"Initializing cache manager with page_num={page_num}, page_size={page_size}, GPU Memory Usage = {total_memory_usage_gb} GB"
+        )
+
         self.config = config
         self.model = ScheduleEngine.load_model(config)
-        self.cache_manager = CacheManager(256)  # TODO: FIXME
+        self.cache_manager = CacheManager(
+            max_request=max_request,
+            page_num=page_num,
+            page_size=page_size,
+            max_page_per_req=config.context_len // page_size,
+            dtype=torch.float16,
+            head_num=config.num_attention_heads,
+            head_dim=config.head_dim,
+            layer_num=config.num_hidden_layers,
+            device="cuda",
+        )
         self.request_pool = RequestPool()
         self.max_concurrent_requests = 16
-        self.context = SchedulerContext.new()
+        self.context = SchedulerContext.new(
+            [], self.cache_manager, torch.tensor([0]), torch.tensor([0])
+        )
 
     @torch.inference_mode()
     def iteration_step(self):
