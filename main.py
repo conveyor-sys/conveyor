@@ -1,4 +1,5 @@
 from conveyor.models.config import ModelConfig
+from conveyor.scheduling.context import RequestInfo
 from conveyor.scheduling.scheduler import ScheduleEngine
 import logging
 
@@ -12,6 +13,9 @@ def main():
     logging.info(f"Loading model {model_name}")
     engine = ScheduleEngine(ModelConfig(model_name))
     logging.info(f"Model {model_name} loaded")
+    engine.request_pool.add_request("Hello, how are you?")
+    logging.info("Request added")
+    print(engine.request_pool.queued_requests[0].tokens)
 
 
 if __name__ == "__main__":

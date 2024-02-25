@@ -132,6 +132,6 @@ class RequestInfo:
     def __init__(self, req_id: int, input_text: str, tokenizer, state: RequestState):
         self.req_id = req_id
         self.input_text = input_text
-        self.tokens = tokenizer.encode(input_text)  # TODO: FIXME
+        self.tokens = tokenizer.encode(input_text)
         self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None

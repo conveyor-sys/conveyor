@@ -1,32 +1,16 @@
 from __future__ import annotations
-from functools import lru_cache
-from pathlib import Path
 from typing import Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
+from conveyor.models.utils import load_model, load_tokenizer
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
 from conveyor.scheduling.request_pool import RequestPool
 from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
-from transformers import PretrainedConfig
 import torch
-from torch import nn
-import conveyor
-import importlib
 import logging
 
 logging = logging.getLogger(__name__)
-
-
-@lru_cache()
-def import_model_classes():
-    model_arch_name_to_cls = {}
-    for module_path in (Path(conveyor.__file__).parent / "models").glob("*.py"):
-        module = importlib.import_module(f"conveyor.models.{module_path.stem}")
-        if hasattr(module, "EntryClass"):
-            model_arch_name_to_cls[module.EntryClass.__name__] = module.EntryClass
-    logging.debug(f"Loaded model classes: {model_arch_name_to_cls.keys()}")
-    return model_arch_name_to_cls
 
 
 @dataclass
@@ -107,7 +91,8 @@ class ScheduleEngine:
         )
 
         self.config = config
-        self.model = ScheduleEngine.load_model(config)
+        self.model = load_model(config)
+        self.tokenizer = load_tokenizer(config.path)
         self.cache_manager = CacheManager(
             max_request=max_request,
             page_num=page_num,
@@ -119,7 +104,7 @@ class ScheduleEngine:
             layer_num=config.num_hidden_layers,
             device="cuda",
         )
-        self.request_pool = RequestPool()
+        self.request_pool = RequestPool(self.tokenizer)
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new(
             [], self.cache_manager, torch.tensor([0]), torch.tensor([0])
@@ -140,43 +125,6 @@ class ScheduleEngine:
             len(self.request_pool.queued_requests) > 0
             and len(self.context.requests) < self.max_concurrent_requests
         )
-
-    @staticmethod
-    def load_model(config: PretrainedConfig) -> nn.Module:
-        def get_model_cls_by_arch_name(model_arch_names):
-            model_arch_name_to_cls = import_model_classes()
-            model_class = None
-            for arch in model_arch_names:
-                if arch in model_arch_name_to_cls:
-                    model_class = model_arch_name_to_cls[arch]
-                    break
-            else:
-                raise ValueError(
-                    f"Unsupported architectures: {arch}. "
-                    f"Supported list: {list(model_arch_name_to_cls.keys())}"
-                )
-            return model_class
-
-        architectures = getattr(config.hf_config, "architectures", [])
-        logging.debug(
-            f"Loading model with architectures: {architectures}, config: {config.hf_config}"
-        )
-        model_class = get_model_cls_by_arch_name(architectures)
-
-        # Load weights
-        linear_method = None
-        old_dtype = torch.get_default_dtype()
-        torch.set_default_dtype(torch.float16)
-        with torch.device("cuda"):
-            model = model_class(config=config.hf_config, linear_method=linear_method)
-        model.load_weights(
-            config.path,
-            cache_dir=None,
-            load_format="auto",
-            revision=None,
-        )
-        torch.set_default_dtype(old_dtype)
-        return model.eval()
 
     def manage_memory(self) -> None:
         pass
