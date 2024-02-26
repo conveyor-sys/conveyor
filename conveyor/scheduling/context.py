@@ -70,7 +70,7 @@ class InferenceContext:
             dim=0,
         ).contiguous()
         kv_last_page_lens = (
-            torch.remainder(seq_lens, cache_manager.page_size) + 1
+            torch.remainder(seq_lens - 1, cache_manager.page_size) + 1
         ).int()
         workspace_buffer = torch.empty(
             32 * 1024 * 1024, dtype=torch.int8, device="cuda"

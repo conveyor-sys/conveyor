@@ -25,8 +25,8 @@ class HookAttention(nn.Module):
         v: torch.Tensor,
         context: InferenceContext,
     ) -> torch.Tensor:
-        k = k.view(-1, self.num_kv_heads, self.head_dim)
-        v = v.view(-1, self.num_kv_heads, self.head_dim)
+        k = k.contiguous().view(-1, self.num_kv_heads, self.head_dim)
+        v = v.contiguous().view(-1, self.num_kv_heads, self.head_dim)
         match context.state:
             case InferenceState.PREFILL:
                 return self.prefill_forward(q, k, v, context)
@@ -49,7 +49,6 @@ class HookAttention(nn.Module):
         output: torch.Tensor = context.prefill_wrapper.forward(
             q.contiguous().view(-1, self.num_q_heads, self.head_dim),
             context.cache_manager.kv_storage[self.layer_id],
-            True,
         )
         return output.view(-1, self.num_q_heads * self.head_dim)
 
@@ -72,7 +71,7 @@ class HookAttention(nn.Module):
     ):
         kv_data = context.cache_manager.kv_storage[self.layer_id]
         logging.debug(
-            f"HookAttention::store_kv_cache(): k={k_cache.shape}, v={v_cache.shape}, kv_data={kv_data.shape}"
+            f"store_kv_cache()[{self.layer_id}]: kv_data={kv_data.shape}, k_cache={k_cache.shape}, v_cache={v_cache.shape}"
         )
         flashinfer.append_paged_kv_cache(
             k_cache,

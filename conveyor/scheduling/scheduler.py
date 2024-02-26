@@ -160,9 +160,6 @@ class ScheduleEngine:
         req_ids = torch.tensor(
             [req.req_id for req in sched_ctx.requests], device="cuda"
         )
-        logging.debug(
-            f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}"
-        )
 
         # calculate how many pages to allocate
         page_needed, page_idx_start = compute_page_needed(
@@ -191,7 +188,16 @@ class ScheduleEngine:
             sched_ctx.completed_lens,
         )
 
-        self.model.forward(req_ids, sched_ctx.seq_lens, inference_ctx)
+        flatten_tokens = []
+        for req in sched_ctx.requests:
+            flatten_tokens.extend(req.tokens)
+        tokens = torch.tensor(flatten_tokens, dtype=torch.int32, device="cuda")
+
+        logging.debug(
+            f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, tokens={tokens}"
+        )
+
+        self.model.forward(tokens, sched_ctx.seq_lens, inference_ctx)
 
     def forward_decode(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
@@ -218,4 +224,11 @@ class ScheduleEngine:
             sched_ctx.seq_lens,
             sched_ctx.completed_lens,
         )
-        self.model.forward(req_ids, fill_pos, inference_ctx)
+
+        tokens = torch.tensor(
+            [req.tokens[-1] for req in sched_ctx.requests],
+            dtype=torch.int32,
+            device="cuda",
+        )
+
+        self.model.forward(tokens, fill_pos, inference_ctx)
