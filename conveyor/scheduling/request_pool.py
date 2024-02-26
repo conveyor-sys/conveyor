@@ -1,9 +1,5 @@
 from __future__ import annotations
-from enum import Enum
 from typing import List
-
-from attr import dataclass
-import torch
 
 from conveyor.scheduling.context import RequestInfo, RequestState
 
@@ -18,6 +14,7 @@ class RequestPool:
         self.queued_requests.append(req)
 
     def add_request(self, text: str):
+        assert len(text) > 0
         self._add_request(
             RequestInfo(
                 req_id=self.req_id_cnt,

@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import List
 from typing import Optional
 from transformers import AutoConfig
 

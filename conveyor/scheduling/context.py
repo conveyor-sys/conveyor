@@ -1,10 +1,11 @@
 from __future__ import annotations
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 import datetime
 
 from attr import dataclass
+import math
 import torch
 from flashinfer import (
     BatchDecodeWithPagedKVCacheWrapper,
@@ -13,6 +14,9 @@ from flashinfer import (
 from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
+import logging
+
+logging = logging.getLogger(__name__)
 
 
 class InferenceState(Enum):
@@ -55,10 +59,14 @@ class InferenceContext:
         # KV cache
         kv_indptr = torch.zeros((batch_size + 1,), dtype=torch.int32, device="cuda")
         kv_indptr[1:] = seq_lens.cumsum(dim=0)
+        logging.debug(
+            f"InferenceContext::new(): batch_size={batch_size}, kv_indptr={kv_indptr}"
+        )
         kv_page_index = torch.cat(
             [
                 cache_manager.req_page_mapping[
-                    req_ids[i], torch.ceil_div(seq_lens[i], cache_manager.page_size)
+                    req_ids[i],
+                    : int(math.ceil((int(seq_lens[i]) + 1) / cache_manager.page_size)),
                 ]
                 for i in range(batch_size)
             ],
@@ -68,9 +76,7 @@ class InferenceContext:
         workspace_buffer = torch.empty(
             32 * 1024 * 1024, dtype=torch.int8, device="cuda"
         )
-        qo_indptr = torch.zeros(
-            (batch_size + 1,), dtype=torch.int32, device=config.device
-        )
+        qo_indptr = torch.zeros((batch_size + 1,), dtype=torch.int32, device="cuda")
         qo_indptr[1:] = (seq_lens - filling_start_offset).cumsum(dim=0)
 
         match state:
@@ -132,6 +138,6 @@ class RequestInfo:
     def __init__(self, req_id: int, input_text: str, tokenizer, state: RequestState):
         self.req_id = req_id
         self.input_text = input_text
-        self.tokens = tokenizer.encode(input_text)
+        self.tokens: List = tokenizer.encode(input_text)
         self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None

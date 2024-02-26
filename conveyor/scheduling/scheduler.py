@@ -152,13 +152,16 @@ class ScheduleEngine:
     def forward_prefill(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         req_ids = torch.tensor([req.req_id for req in sched_ctx.requests])
+        logging.debug(
+            f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}"
+        )
 
         # calculate how many pages to allocate
         page_needed, page_idx_start = compute_page_needed(
             sched_ctx.seq_lens, sched_ctx.completed_lens, self.cache_manager.page_size
         )
 
-        new_page_idx = self.cache_manager.alloc_pages(page_needed.sum().item())
+        new_page_idx = self.cache_manager.alloc_pages(int(page_needed.sum().item()))
         if new_page_idx is None:
             raise RuntimeError("No free pages")
         range_idx = torch.zeros((page_needed.size(0) + 1,), dtype=torch.int64)

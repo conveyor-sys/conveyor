@@ -1,5 +1,4 @@
 from conveyor.models.config import ModelConfig
-from conveyor.scheduling.context import RequestInfo
 from conveyor.scheduling.scheduler import ScheduleEngine
 import logging
 
@@ -16,11 +15,14 @@ def main():
     engine.request_pool.add_request("Hello, how are you?")
     logging.info("Request added")
     print(engine.request_pool.queued_requests[0].tokens)
+
     logging.info("First step")
     engine.iteration_step()
     logging.info("Second step")
     engine.iteration_step()
+    
 
 
 if __name__ == "__main__":
     main()
+
