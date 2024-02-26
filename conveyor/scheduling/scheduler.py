@@ -14,10 +14,18 @@ logging = logging.getLogger(__name__)
 
 
 @dataclass
+class ReqRuntimeStat:
+    req_id: int
+    seq_len: int
+    completed_len: int
+
+
+@dataclass
 class SchedulerContext:
     requests: list[RequestInfo]
     pending_requests: list[RequestInfo]
     cache_manager: CacheManager
+    req_runtime_stats: dict[int, ReqRuntimeStat]
 
     # Batch info
     seq_lens: torch.Tensor
@@ -28,19 +36,30 @@ class SchedulerContext:
         cls,
         reqs: list[RequestInfo],
         cache_manager: CacheManager,
-        seq_lens: torch.Tensor,
-        completed_lens: torch.Tensor,
+        completed_lens: torch.Tensor = None,
     ) -> SchedulerContext:
+        if completed_lens is None:
+            completed_lens = torch.zeros(len(reqs), dtype=torch.int64)
+        seq_lens = torch.tensor([len(req.tokens) for req in reqs])
+        req_runtime_stats = {
+            req.req_id: ReqRuntimeStat(req.req_id, len(req.tokens), 0) for req in reqs
+        }
         return cls(
             requests=reqs,
             pending_requests=[],
             cache_manager=cache_manager,
+            req_runtime_stats=req_runtime_stats,
             seq_lens=seq_lens,
             completed_lens=completed_lens,
         )
 
     def add_active_request(self, req: RequestInfo) -> None:
         self.requests.append(req)
+        self.req_runtime_stats[req.req_id] = ReqRuntimeStat(
+            req.req_id, len(req.tokens), 0
+        )
+        self.seq_lens = torch.cat([self.seq_lens, torch.tensor([len(req.tokens)])])
+        self.completed_lens = torch.cat([self.completed_lens, torch.tensor([0])])
 
 
 def compute_page_needed(
@@ -106,9 +125,7 @@ class ScheduleEngine:
         )
         self.request_pool = RequestPool(self.tokenizer)
         self.max_concurrent_requests = 16
-        self.context = SchedulerContext.new(
-            [], self.cache_manager, torch.tensor([0]), torch.tensor([0])
-        )
+        self.context = SchedulerContext.new([], self.cache_manager)
 
     @torch.inference_mode()
     def iteration_step(self):
@@ -134,7 +151,7 @@ class ScheduleEngine:
 
     def forward_prefill(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
-        req_ids = torch.tensor([req.id for req in sched_ctx.requests])
+        req_ids = torch.tensor([req.req_id for req in sched_ctx.requests])
 
         # calculate how many pages to allocate
         page_needed, page_idx_start = compute_page_needed(
@@ -167,7 +184,7 @@ class ScheduleEngine:
     def forward_decode(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         fill_pos = sched_ctx.seq_lens.clone()
-        req_ids = torch.tensor([req.id for req in sched_ctx.requests])
+        req_ids = torch.tensor([req.req_id for req in sched_ctx.requests])
 
         sched_ctx.seq_lens.add_(1)
         new_page_idx = self.cache_manager.alloc_pages(
