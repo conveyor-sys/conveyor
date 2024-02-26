@@ -71,6 +71,9 @@ class HookAttention(nn.Module):
         self, k_cache: torch.Tensor, v_cache: torch.Tensor, context: InferenceContext
     ):
         kv_data = context.cache_manager.kv_storage[self.layer_id]
+        logging.debug(
+            f"HookAttention::store_kv_cache(): k={k_cache.shape}, v={v_cache.shape}, kv_data={kv_data.shape}"
+        )
         flashinfer.append_paged_kv_cache(
             k_cache,
             v_cache,

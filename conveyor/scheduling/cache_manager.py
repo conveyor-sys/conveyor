@@ -14,7 +14,7 @@ class CacheManager:
         page_size: int,
         max_page_per_req: int,
         dtype,
-        head_num: int,
+        kv_head_num: int,
         head_dim: int,
         layer_num: int,
         device="cuda",
@@ -36,7 +36,7 @@ class CacheManager:
         self.page_state = torch.zeros((page_num,), dtype=torch.bool, device=device)
         self.kv_storage = [
             torch.empty(
-                (page_num, 2, page_size, head_num, head_dim),
+                (page_num, 2, page_size, kv_head_num, head_dim),
                 dtype=dtype,
                 device=device,
             )

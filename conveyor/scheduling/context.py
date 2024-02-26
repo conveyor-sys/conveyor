@@ -59,9 +59,6 @@ class InferenceContext:
         # KV cache
         kv_indptr = torch.zeros((batch_size + 1,), dtype=torch.int32, device="cuda")
         kv_indptr[1:] = seq_lens.cumsum(dim=0)
-        logging.debug(
-            f"InferenceContext::new(): batch_size={batch_size}, kv_indptr={kv_indptr}"
-        )
         kv_page_index = torch.cat(
             [
                 cache_manager.req_page_mapping[
@@ -72,7 +69,9 @@ class InferenceContext:
             ],
             dim=0,
         ).contiguous()
-        kv_last_page_lens = torch.remainder(seq_lens, cache_manager.page_size) + 1
+        kv_last_page_lens = (
+            torch.remainder(seq_lens, cache_manager.page_size) + 1
+        ).int()
         workspace_buffer = torch.empty(
             32 * 1024 * 1024, dtype=torch.int8, device="cuda"
         )
@@ -104,6 +103,9 @@ class InferenceContext:
                     config.head_dim,
                     1,
                 )
+        logging.debug(
+            f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
+        )
 
         return cls(
             state=state,

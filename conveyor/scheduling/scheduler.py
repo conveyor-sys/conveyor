@@ -39,8 +39,10 @@ class SchedulerContext:
         completed_lens: torch.Tensor = None,
     ) -> SchedulerContext:
         if completed_lens is None:
-            completed_lens = torch.zeros(len(reqs), dtype=torch.int64)
-        seq_lens = torch.tensor([len(req.tokens) for req in reqs])
+            completed_lens = torch.zeros(len(reqs), dtype=torch.int32, device="cuda")
+        seq_lens = torch.tensor(
+            [len(req.tokens) for req in reqs], dtype=torch.int32, device="cuda"
+        )
         req_runtime_stats = {
             req.req_id: ReqRuntimeStat(req.req_id, len(req.tokens), 0) for req in reqs
         }
@@ -58,8 +60,12 @@ class SchedulerContext:
         self.req_runtime_stats[req.req_id] = ReqRuntimeStat(
             req.req_id, len(req.tokens), 0
         )
-        self.seq_lens = torch.cat([self.seq_lens, torch.tensor([len(req.tokens)])])
-        self.completed_lens = torch.cat([self.completed_lens, torch.tensor([0])])
+        self.seq_lens = torch.cat(
+            [self.seq_lens, torch.tensor([len(req.tokens)], device="cuda")]
+        )
+        self.completed_lens = torch.cat(
+            [self.completed_lens, torch.tensor([0], device="cuda")]
+        )
 
 
 def compute_page_needed(
@@ -118,7 +124,7 @@ class ScheduleEngine:
             page_size=page_size,
             max_page_per_req=config.context_len // page_size,
             dtype=torch.float16,
-            head_num=config.num_attention_heads,
+            kv_head_num=config.num_key_value_heads,
             head_dim=config.head_dim,
             layer_num=config.num_hidden_layers,
             device="cuda",
@@ -151,7 +157,9 @@ class ScheduleEngine:
 
     def forward_prefill(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
-        req_ids = torch.tensor([req.req_id for req in sched_ctx.requests])
+        req_ids = torch.tensor(
+            [req.req_id for req in sched_ctx.requests], device="cuda"
+        )
         logging.debug(
             f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}"
         )
@@ -182,12 +190,15 @@ class ScheduleEngine:
             sched_ctx.seq_lens,
             sched_ctx.completed_lens,
         )
+
         self.model.forward(req_ids, sched_ctx.seq_lens, inference_ctx)
 
     def forward_decode(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         fill_pos = sched_ctx.seq_lens.clone()
-        req_ids = torch.tensor([req.req_id for req in sched_ctx.requests])
+        req_ids = torch.tensor(
+            [req.req_id for req in sched_ctx.requests], dtype=torch.int64, device="cuda"
+        )
 
         sched_ctx.seq_lens.add_(1)
         new_page_idx = self.cache_manager.alloc_pages(
