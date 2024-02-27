@@ -13,6 +13,7 @@ def main():
     engine = ScheduleEngine(ModelConfig(model_name))
     logging.info(f"Model {model_name} loaded")
     engine.request_pool.add_request("Hello, how are you?")
+    # engine.request_pool.add_request("How are you?")
     logging.info("Request added")
     print(engine.request_pool.queued_requests[0].tokens)
 
@@ -23,16 +24,9 @@ def main():
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
 
-    logging.info("Second step")
-    r = engine.iteration_step()
-    print(f"Result: {r}")
-    print(
-        f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
-    )
-
-    logging.info("Third step")
-    r = engine.iteration_step()
-    print(f"Result: {r}")
+    logging.info("More steps")
+    for _ in range(10):
+        engine.iteration_step()
     print(
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )

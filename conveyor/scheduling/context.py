@@ -57,18 +57,18 @@ class InferenceContext:
     ) -> InferenceContext:
         batch_size = req_ids.size(0)
         # KV cache
+        page_list = [
+            cache_manager.req_page_mapping[
+                req_ids[i],
+                : int(math.ceil(int(seq_lens[i]) / cache_manager.page_size)),
+            ]
+            for i in range(batch_size)
+        ]
         kv_indptr = torch.zeros((batch_size + 1,), dtype=torch.int32, device="cuda")
-        kv_indptr[1:] = seq_lens.cumsum(dim=0)
-        kv_page_index = torch.cat(
-            [
-                cache_manager.req_page_mapping[
-                    req_ids[i],
-                    : int(math.ceil((int(seq_lens[i]) + 1) / cache_manager.page_size)),
-                ]
-                for i in range(batch_size)
-            ],
-            dim=0,
-        ).contiguous()
+        kv_indptr[1:] = (
+            torch.tensor([len(r) for r in page_list]).cumsum(dim=0).to("cuda")
+        )
+        kv_page_index = torch.cat(page_list, dim=0).contiguous()
         kv_last_page_lens = (
             torch.remainder(seq_lens - 1, cache_manager.page_size) + 1
         ).int()
