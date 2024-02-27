@@ -234,9 +234,9 @@ class ScheduleEngine:
             new_page_idx = self.cache_manager.alloc_pages(page_num_required).int()
             if new_page_idx is None:
                 raise RuntimeError("No free pages")
-            logging.debug(
-                f"Allocated pages: req_ids={req_ids}, fill_pos={fill_pos}, new_page_idx={new_page_idx}"
-            )
+            # logging.debug(
+            #     f"Allocated pages: req_ids={req_ids}, fill_pos={fill_pos}, new_page_idx={new_page_idx}"
+            # )
             self.cache_manager.req_page_mapping[
                 req_ids, fill_pos // self.cache_manager.page_size
             ] = new_page_idx

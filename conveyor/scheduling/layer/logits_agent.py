@@ -26,9 +26,6 @@ class LogitsAgent(nn.Module):
         context: InferenceContext,
     ):
         # TODO: log probability?
-        logging.debug(
-            f"LogitsAgent: input_ids.shape={input_ids.shape}, hidden_states.shape={hidden_states.shape}, weight.shape={weight.shape}"
-        )
         if context.state == InferenceState.DECODE:
             last_hidden = hidden_states
         else:
@@ -40,13 +37,9 @@ class LogitsAgent(nn.Module):
                 )
                 - 1
             )
-            logging.debug(f"LogitsAgent: last_index={last_index}")
             last_hidden = hidden_states[last_index]
             hidden_states = None
 
-        logging.debug(
-            f"LogitsAgent: last_hidden.shape={last_hidden.shape}, weight.T.shape={weight.T.shape}"
-        )
         logits = torch.matmul(last_hidden, weight.T)
         if self.tensor_parallel_size > 1:
             logits = tensor_model_parallel_all_gather(logits)

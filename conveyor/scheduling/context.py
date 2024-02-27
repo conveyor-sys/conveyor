@@ -102,9 +102,9 @@ class InferenceContext:
                     config.head_dim,
                     1,
                 )
-        logging.debug(
-            f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
-        )
+        # logging.debug(
+        #     f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
+        # )
 
         return cls(
             state=state,
@@ -139,6 +139,10 @@ class RequestInfo:
     def __init__(self, req_id: int, input_text: str, tokenizer, state: RequestState):
         self.req_id = req_id
         self.input_text = input_text
+        self.tokenizer = tokenizer
         self.tokens: List = tokenizer.encode(input_text)
         self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None
+
+    def decode(self) -> str:
+        return self.tokenizer.decode(self.tokens)
