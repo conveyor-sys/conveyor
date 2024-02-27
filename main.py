@@ -17,12 +17,19 @@ def main():
     print(engine.request_pool.queued_requests[0].tokens)
 
     logging.info("First step")
-    engine.iteration_step()
+    r = engine.iteration_step()
+    print(f"Result: {r}")
+    print(
+        f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
+    )
+
     logging.info("Second step")
-    engine.iteration_step()
-    
+    r = engine.iteration_step()
+    print(f"Result: {r}")
+    print(
+        f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
+    )
 
 
 if __name__ == "__main__":
     main()
-

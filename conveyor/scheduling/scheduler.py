@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Tuple
+from typing import List, Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
@@ -66,6 +66,17 @@ class SchedulerContext:
         self.completed_lens = torch.cat(
             [self.completed_lens, torch.tensor([0], device="cuda")]
         )
+
+    def update_req(self, logits: torch.Tensor) -> None:
+        assert len(logits) == len(self.requests)
+        for i, req in enumerate(self.requests):
+            self.req_runtime_stats[req.req_id].completed_len = self.req_runtime_stats[
+                req.req_id
+            ].seq_len
+            self.req_runtime_stats[req.req_id].seq_len += 1
+            self.completed_lens = self.seq_lens.clone()
+            self.seq_lens += 1
+            req.tokens.append(logits[i].item())
 
 
 def compute_page_needed(
@@ -138,9 +149,15 @@ class ScheduleEngine:
         if self.new_request_available():
             new_request = self.request_pool.pop_request()
             self.context.add_active_request(new_request)
-            self.forward_prefill(self.context)
+            logits, _ = self.forward_prefill(self.context)
         else:
-            self.forward_decode(self.context)
+            logits, _ = self.forward_decode(self.context)
+        result = self.sample_logits(logits)
+        self.context.update_req(result)
+        return result
+
+    def sample_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        return torch.argmax(logits, dim=-1)
 
     def new_request_available(self) -> bool:
         # TODO: better policy
@@ -197,7 +214,7 @@ class ScheduleEngine:
             f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, tokens={tokens}"
         )
 
-        self.model.forward(tokens, sched_ctx.seq_lens, inference_ctx)
+        return self.model.forward(tokens, sched_ctx.seq_lens, inference_ctx)
 
     def forward_decode(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
@@ -231,4 +248,4 @@ class ScheduleEngine:
             device="cuda",
         )
 
-        self.model.forward(tokens, fill_pos, inference_ctx)
+        return self.model.forward(tokens, fill_pos, inference_ctx)
