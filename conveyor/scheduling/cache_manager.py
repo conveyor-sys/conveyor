@@ -65,6 +65,7 @@ class CacheManager:
         new_page_idx = torch.nonzero(self.page_state == 0).squeeze(1)[:page_num]
         self.page_state[new_page_idx] = True
         self.free_pages_cnt -= page_num
+        logging.debug(f"Allocated pages: new_page_idx.dtype={new_page_idx.dtype}")
         return new_page_idx
 
     def free_pages(self, page_idx: torch.Tensor | int) -> None:

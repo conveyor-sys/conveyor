@@ -74,9 +74,8 @@ class SchedulerContext:
                 req.req_id
             ].seq_len
             self.req_runtime_stats[req.req_id].seq_len += 1
-            self.completed_lens = self.seq_lens.clone()
-            self.seq_lens += 1
             req.tokens.append(logits[i].item())
+        self.completed_lens = self.seq_lens.clone()
 
 
 def compute_page_needed(
@@ -183,18 +182,20 @@ class ScheduleEngine:
             sched_ctx.seq_lens, sched_ctx.completed_lens, self.cache_manager.page_size
         )
 
-        new_page_idx = self.cache_manager.alloc_pages(int(page_needed.sum().item()))
-        if new_page_idx is None:
-            raise RuntimeError("No free pages")
-        range_idx = torch.zeros((page_needed.size(0) + 1,), dtype=torch.int64)
-        range_idx[1:] = page_needed.cumsum(dim=0)
-        for i in range(page_needed.size(0)):
-            self.cache_manager.req_page_mapping[
-                req_ids[i],
-                page_idx_start[i] : (
-                    page_idx_start[i] + range_idx[i + 1] - range_idx[i]
-                ),
-            ] = new_page_idx[range_idx[i] : range_idx[i + 1]]
+        page_num_required = int(page_needed.sum().item())
+        if page_num_required > 0:
+            new_page_idx = self.cache_manager.alloc_pages(page_num_required).int()
+            if new_page_idx is None:
+                raise RuntimeError("No free pages")
+            range_idx = torch.zeros((page_needed.size(0) + 1,), dtype=torch.int64)
+            range_idx[1:] = page_needed.cumsum(dim=0)
+            for i in range(page_needed.size(0)):
+                self.cache_manager.req_page_mapping[
+                    req_ids[i],
+                    page_idx_start[i] : (
+                        page_idx_start[i] + range_idx[i + 1] - range_idx[i]
+                    ),
+                ] = new_page_idx[range_idx[i] : range_idx[i + 1]]
 
         inference_ctx = InferenceContext.new(
             InferenceState.PREFILL,
@@ -224,14 +225,21 @@ class ScheduleEngine:
         )
 
         sched_ctx.seq_lens.add_(1)
-        new_page_idx = self.cache_manager.alloc_pages(
-            fill_pos[fill_pos % self.cache_manager.page_size == 0].count_nonzero()
+        page_num_required = int(
+            fill_pos[fill_pos % self.cache_manager.page_size == 0]
+            .count_nonzero()
+            .item()
         )
-        if new_page_idx is None:
-            raise RuntimeError("No free pages")
-        self.cache_manager.req_page_mapping[
-            req_ids, fill_pos // self.cache_manager.page_size
-        ] = new_page_idx
+        if page_num_required > 0:
+            new_page_idx = self.cache_manager.alloc_pages(page_num_required).int()
+            if new_page_idx is None:
+                raise RuntimeError("No free pages")
+            logging.debug(
+                f"Allocated pages: req_ids={req_ids}, fill_pos={fill_pos}, new_page_idx={new_page_idx}"
+            )
+            self.cache_manager.req_page_mapping[
+                req_ids, fill_pos // self.cache_manager.page_size
+            ] = new_page_idx
 
         inference_ctx = InferenceContext.new(
             InferenceState.DECODE,

@@ -97,7 +97,6 @@ class InferenceContext:
                     kv_indptr,
                     kv_page_index,
                     kv_last_page_lens,
-                    batch_size,
                     config.num_attention_heads,
                     config.num_key_value_heads,
                     config.head_dim,

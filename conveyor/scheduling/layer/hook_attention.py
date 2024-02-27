@@ -73,6 +73,9 @@ class HookAttention(nn.Module):
         # logging.debug(
         #     f"store_kv_cache()[{self.layer_id}]: kv_data={kv_data.shape}, k_cache={k_cache.shape}, v_cache={v_cache.shape}"
         # )
+        # logging.debug(
+        #     f"store_kv_cache()[{self.layer_id}]: qo_indptr={context.qo_indptr}, kv_indptr={context.kv_indptr}, kv_page_indices={context.kv_page_indices}, kv_last_page_lens={context.kv_last_page_lens}"
+        # )
         flashinfer.append_paged_kv_cache(
             k_cache,
             v_cache,

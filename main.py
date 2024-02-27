@@ -30,6 +30,13 @@ def main():
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
 
+    logging.info("Third step")
+    r = engine.iteration_step()
+    print(f"Result: {r}")
+    print(
+        f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
+    )
+
 
 if __name__ == "__main__":
     main()
