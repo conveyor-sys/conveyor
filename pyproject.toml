@@ -1,3 +1,4 @@
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -5,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "conveyor"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "torch"
-]
+dependencies = ["torch", "flashinfer", "outlines", "vllm", "transformers"]
+
+[tool.pytest]
+testpaths = ["test"]
