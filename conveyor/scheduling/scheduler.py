@@ -8,6 +8,7 @@ from conveyor.scheduling.context import InferenceContext, InferenceState, Reques
 from conveyor.scheduling.request_pool import RequestPool
 from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
 import torch
+import numpy as np
 import logging
 
 logging = logging.getLogger(__name__)
@@ -254,11 +255,24 @@ class ScheduleEngine:
             flatten_tokens.extend(req.tokens)
         tokens = torch.tensor(flatten_tokens, dtype=torch.int32, device="cuda")
 
-        logging.debug(
-            f"Forward append(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, tokens={tokens}"
+        seq_lens_np = sched_ctx.seq_lens.cpu().numpy()
+        completed_lens_np = sched_ctx.completed_lens.cpu().numpy()
+        positions = torch.tensor(
+            np.concatenate(
+                [
+                    np.arange(completed_lens_np[i], seq_lens_np[i])
+                    for i in range(len(seq_lens_np))
+                ],
+                axis=0,
+            ),
+            device="cuda",
         )
 
-        return self.model.forward(tokens, sched_ctx.seq_lens, inference_ctx)
+        logging.debug(
+            f"Forward append(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, positions={positions}, tokens={tokens}"
+        )
+
+        return self.model.forward(tokens, positions, inference_ctx)
 
     def forward_decode(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()

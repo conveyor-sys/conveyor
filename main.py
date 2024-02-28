@@ -16,6 +16,7 @@ def main():
     # engine.request_pool.add_request("Hello, how are you?")
     # engine.request_pool.add_request("How are you?")
     req_id = engine.request_pool.add_request(
+        # "Describe the basic components of a neural network and how it can be trained"
         "[INST]Describe the basic components of a neural network and how it can be trained.[/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
     )
@@ -34,7 +35,7 @@ def main():
 
 
     logging.info("Decode")
-    generation_num = 15
+    generation_num = 50
     decode_start = time.perf_counter()
     for _ in range(generation_num):
         engine.iteration_step()
@@ -42,9 +43,10 @@ def main():
 
     logging.info("Add another request")
     engine.extend_req_with_str(req_id, "</s>\n<s>[INST]Let's stop here and continue later. Now tell me how to write a GCD in Python?[/INST]")
+    # engine.extend_req_with_str(req_id, "STOP!!! JUST SAY NO!!!")
     engine.iteration_step()
 
-    for _ in range(350):
+    for _ in range(50):
         engine.iteration_step()
 
     print(
