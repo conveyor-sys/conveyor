@@ -250,13 +250,14 @@ class ScheduleEngine:
             sched_ctx.completed_lens,
         )
 
-        flatten_tokens = []
-        for req in sched_ctx.requests:
-            flatten_tokens.extend(req.tokens)
-        tokens = torch.tensor(flatten_tokens, dtype=torch.int32, device="cuda")
-
         seq_lens_np = sched_ctx.seq_lens.cpu().numpy()
         completed_lens_np = sched_ctx.completed_lens.cpu().numpy()
+
+        flatten_tokens = []
+        for idx, req in enumerate(sched_ctx.requests):
+            flatten_tokens.extend(req.tokens[completed_lens_np[idx] :])
+        tokens = torch.tensor(flatten_tokens, dtype=torch.int32, device="cuda")
+
         positions = torch.tensor(
             np.concatenate(
                 [
