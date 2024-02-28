@@ -20,6 +20,7 @@ def main():
         "[INST]Describe the basic components of a neural network and how it can be trained.[/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
     )
+    req2_id = engine.request_pool.add_request("[INST]Generate a JSON .[/INST]")
     logging.info("Request added")
     print(engine.request_pool.queued_requests[0].tokens)
 
@@ -33,7 +34,6 @@ def main():
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
 
-
     logging.info("Decode")
     generation_num = 50
     decode_start = time.perf_counter()
@@ -42,7 +42,10 @@ def main():
     decode_end = time.perf_counter()
 
     logging.info("Add another request")
-    engine.extend_req_with_str(req_id, "</s>\n<s>[INST]Let's stop here and continue later. Now tell me how to write a GCD in Python?[/INST]")
+    engine.extend_req_with_str(
+        req_id,
+        "</s>\n<s>[INST]Let's stop here and continue later. Now tell me how to write a GCD in Python?[/INST]",
+    )
     # engine.extend_req_with_str(req_id, "STOP!!! JUST SAY NO!!!")
     engine.iteration_step()
 
@@ -50,9 +53,14 @@ def main():
         engine.iteration_step()
 
     print(
+        f"Engine CTX: requests={[r.req_id for r in engine.context.requests]}, pending={[r.req_id for r in engine.context.pending_requests]}, stats={engine.context.req_runtime_stats}"
+    )
+
+    print(
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
     print(f"Req: {engine.context.requests[0].decode()}")
+    print(f"Req2: {engine.context.requests[1].decode()}")
     print(f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s")
     print(f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s")
 

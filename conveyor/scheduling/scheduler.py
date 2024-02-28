@@ -68,12 +68,7 @@ class SchedulerContext:
         self.req_runtime_stats[req.req_id] = ReqRuntimeStat(
             req.req_id, len(req.tokens), 0
         )
-        # self.seq_lens = torch.cat(
-        #     [self.seq_lens, torch.tensor([len(req.tokens)], device="cuda")]
-        # )
-        # self.completed_lens = torch.cat(
-        #     [self.completed_lens, torch.tensor([0], device="cuda")]
-        # )
+        logging.debug(f"Current requests: {[req.req_id for req in self.requests]}")
 
     # Update the context state after a forward pass
     def update_req(self, logits: torch.Tensor) -> None:
@@ -199,9 +194,10 @@ class ScheduleEngine:
     def iteration_step(self):
         if self.new_request_available():
             new_request = self.request_pool.pop_request()
+            logging.info(f"Scheduler: new request={new_request.req_id}")
             self.context.add_active_request(new_request)
         next_operation = self.schedule_next_operation()
-        logging.debug(f"Scheduler: next operation={next_operation}")
+        # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
             case InferenceState.APPEND:
                 logits, _ = self.forward_append(self.context)
@@ -327,15 +323,18 @@ class ScheduleEngine:
         # if any prefillable, do prefill
         if len(prefill_list) > 0:
             decode_list = []
-            for req in prefill_list:
+            for req in self.context.requests:
                 if (
                     self.context.req_runtime_stats[req.req_id].completed_len
-                    == len(req.tokens) - 1
+                    >= len(req.tokens) - 1
                 ):
                     decode_list.append(req)
             self.context.pending_requests = decode_list + self.context.pending_requests
             self.context.requests = prefill_list
             self.context._recompute_batch_state()
+            logging.debug(
+                f"Next Prefill: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+            )
             return InferenceState.APPEND
         else:
             changed = False
@@ -346,5 +345,8 @@ class ScheduleEngine:
                 self.context.requests.append(self.context.pending_requests.pop(0))
                 changed = True
             if changed:
+                logging.debug(
+                    f"Next Decode: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+                )
                 self.context._recompute_batch_state()
             return InferenceState.DECODE

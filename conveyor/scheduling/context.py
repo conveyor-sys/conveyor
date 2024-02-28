@@ -101,9 +101,9 @@ class InferenceContext:
                     config.head_dim,
                     1,
                 )
-        logging.debug(
-            f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
-        )
+        # logging.debug(
+        #     f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
+        # )
 
         return cls(
             state=state,
