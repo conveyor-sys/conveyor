@@ -31,6 +31,8 @@ class SchedulerContext:
     seq_lens: torch.Tensor
     completed_lens: torch.Tensor
 
+    # Volatile state
+
     @classmethod
     def new(
         cls,
@@ -39,12 +41,17 @@ class SchedulerContext:
         completed_lens: torch.Tensor = None,
     ) -> SchedulerContext:
         if completed_lens is None:
-            completed_lens = torch.zeros(len(reqs), dtype=torch.int32, device="cuda")
+            completed_lens = torch.zeros(len(reqs), dtype=torch.int64, device="cuda")
         seq_lens = torch.tensor(
-            [len(req.tokens) for req in reqs], dtype=torch.int32, device="cuda"
+            [len(req.tokens) for req in reqs], dtype=torch.int64, device="cuda"
         )
         req_runtime_stats = {
-            req.req_id: ReqRuntimeStat(req.req_id, len(req.tokens), 0) for req in reqs
+            req.req_id: ReqRuntimeStat(
+                req.req_id,
+                len(req.tokens),
+                completed_lens[idx],
+            )
+            for idx, req in enumerate(reqs)
         }
         return cls(
             requests=reqs,
@@ -60,13 +67,14 @@ class SchedulerContext:
         self.req_runtime_stats[req.req_id] = ReqRuntimeStat(
             req.req_id, len(req.tokens), 0
         )
-        self.seq_lens = torch.cat(
-            [self.seq_lens, torch.tensor([len(req.tokens)], device="cuda")]
-        )
-        self.completed_lens = torch.cat(
-            [self.completed_lens, torch.tensor([0], device="cuda")]
-        )
+        # self.seq_lens = torch.cat(
+        #     [self.seq_lens, torch.tensor([len(req.tokens)], device="cuda")]
+        # )
+        # self.completed_lens = torch.cat(
+        #     [self.completed_lens, torch.tensor([0], device="cuda")]
+        # )
 
+    # Update the context state after a forward pass
     def update_req(self, logits: torch.Tensor) -> None:
         assert len(logits) == len(self.requests)
         for i, req in enumerate(self.requests):
@@ -76,6 +84,28 @@ class SchedulerContext:
             self.req_runtime_stats[req.req_id].seq_len += 1
             req.tokens.append(logits[i].item())
         self.completed_lens = self.seq_lens.clone()
+
+    # Extend the request with string appended to the end
+    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
+        for idx, req in enumerate(self.requests):
+            if req.req_id == req_id:
+                req.extend_str_no_re_encoding(new_content)
+                self.seq_lens[idx] = len(req.tokens)
+                self.req_runtime_stats[req.req_id].seq_len = len(req.tokens)
+                return
+        logging.warning(f"Request {req_id} not found")
+
+    def _recompute_batch_state(self) -> None:
+        self.seq_lens = torch.tensor(
+            [len(req.tokens) for req in self.requests],
+            dtype=torch.int64,
+            device="cuda",
+        )
+        self.completed_lens = torch.tensor(
+            [self.req_runtime_stats[req.req_id].completed_len for req in self.requests],
+            dtype=torch.int64,
+            device="cuda",
+        )
 
 
 def compute_page_needed(
@@ -148,9 +178,16 @@ class ScheduleEngine:
         if self.new_request_available():
             new_request = self.request_pool.pop_request()
             self.context.add_active_request(new_request)
-            logits, _ = self.forward_prefill(self.context)
-        else:
-            logits, _ = self.forward_decode(self.context)
+        next_operation = self.schedule_next_operation()
+        logging.debug(f"Scheduler: next operation={next_operation}")
+        match next_operation:
+            case InferenceState.APPEND:
+                logits, _ = self.forward_append(self.context)
+            case InferenceState.DECODE:
+                logits, _ = self.forward_decode(self.context)
+            case InferenceState.AWAIT:
+                logging.error("Scheduler: no-op in AWAIT state")
+                return
         result = self.sample_logits(logits)
         self.context.update_req(result)
         return result
@@ -171,7 +208,10 @@ class ScheduleEngine:
     def add_new_request(self, req: RequestInfo) -> None:
         self.request_pool.add_request(req)
 
-    def forward_prefill(self, sched_ctx: SchedulerContext) -> None:
+    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
+        self.context.extend_req_with_str(req_id, new_content)
+
+    def forward_append(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         req_ids = torch.tensor(
             [req.req_id for req in sched_ctx.requests], device="cuda"
@@ -198,7 +238,7 @@ class ScheduleEngine:
                 ] = new_page_idx[range_idx[i] : range_idx[i + 1]]
 
         inference_ctx = InferenceContext.new(
-            InferenceState.PREFILL,
+            InferenceState.APPEND,
             self.config,
             sched_ctx.cache_manager,
             req_ids,
@@ -212,7 +252,7 @@ class ScheduleEngine:
         tokens = torch.tensor(flatten_tokens, dtype=torch.int32, device="cuda")
 
         logging.debug(
-            f"Forward prefill(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, tokens={tokens}"
+            f"Forward append(): req_ids={req_ids}, seq_lens={sched_ctx.seq_lens}, completed_lens={sched_ctx.completed_lens}, tokens={tokens}"
         )
 
         return self.model.forward(tokens, sched_ctx.seq_lens, inference_ctx)
@@ -257,3 +297,34 @@ class ScheduleEngine:
         )
 
         return self.model.forward(tokens, fill_pos, inference_ctx)
+
+    def schedule_next_operation(self) -> InferenceState:
+        prefill_list = []
+        for req in self.context.requests:
+            if self.context.req_runtime_stats[req.req_id].completed_len < len(
+                req.tokens
+            ):
+                prefill_list.append(req)
+        # if any prefillable, do prefill
+        if len(prefill_list) > 0:
+            decode_list = []
+            for req in prefill_list:
+                if self.context.req_runtime_stats[req.req_id].completed_len == len(
+                    req.tokens
+                ):
+                    decode_list.append(req)
+            self.context.pending_requests = decode_list + self.context.pending_requests
+            self.context.requests = prefill_list
+            self.context._recompute_batch_state()
+            return InferenceState.APPEND
+        else:
+            changed = False
+            while (
+                len(self.context.pending_requests) > 0
+                and len(self.context.requests) < self.max_concurrent_requests
+            ):
+                self.context.requests.append(self.context.pending_requests.pop(0))
+                changed = True
+            if changed:
+                self.context._recompute_batch_state()
+            return InferenceState.DECODE

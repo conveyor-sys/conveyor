@@ -15,13 +15,13 @@ def main():
     logging.info(f"Model {model_name} loaded")
     # engine.request_pool.add_request("Hello, how are you?")
     # engine.request_pool.add_request("How are you?")
-    engine.request_pool.add_request(
+    req_id = engine.request_pool.add_request(
         "Describe the basic components of a neural network and how it can be trained."
     )
     logging.info("Request added")
     print(engine.request_pool.queued_requests[0].tokens)
 
-    logging.info("First step")
+    logging.info("Prefill")
     prefill_len = len(engine.request_pool.queued_requests[0].tokens)
     prefill_start = time.perf_counter()
     r = engine.iteration_step()
@@ -31,7 +31,7 @@ def main():
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
 
-    logging.info("More steps")
+    logging.info("Decode")
     generation_num = 500
     decode_start = time.perf_counter()
     for _ in range(generation_num):
