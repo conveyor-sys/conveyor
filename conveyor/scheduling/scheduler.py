@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Tuple
+from typing import Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
@@ -119,7 +119,7 @@ def compute_page_needed(
     page_start = completed_lens // page_size
     page_start_not_allocated = completed_lens % page_size == 0
     page_needed = page_end - page_start + page_start_not_allocated
-    return page_needed, page_start
+    return page_needed, page_start + (~page_start_not_allocated)
 
 
 class ScheduleEngine:
@@ -173,6 +173,27 @@ class ScheduleEngine:
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new([], self.cache_manager)
 
+    def sample_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        return torch.argmax(logits, dim=-1)
+
+    def new_request_available(self) -> bool:
+        # TODO: better policy
+        return (
+            len(self.request_pool.queued_requests) > 0
+            and len(self.context.requests) < self.max_concurrent_requests
+        )
+
+    def manage_memory(self) -> None:
+        pass
+
+    @torch.inference_mode()
+    def add_new_request(self, req: RequestInfo) -> None:
+        self.request_pool.add_request(req)
+
+    @torch.inference_mode()
+    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
+        self.context.extend_req_with_str(req_id, new_content)
+
     @torch.inference_mode()
     def iteration_step(self):
         if self.new_request_available():
@@ -192,25 +213,6 @@ class ScheduleEngine:
         self.context.update_req(result)
         return result
 
-    def sample_logits(self, logits: torch.Tensor) -> torch.Tensor:
-        return torch.argmax(logits, dim=-1)
-
-    def new_request_available(self) -> bool:
-        # TODO: better policy
-        return (
-            len(self.request_pool.queued_requests) > 0
-            and len(self.context.requests) < self.max_concurrent_requests
-        )
-
-    def manage_memory(self) -> None:
-        pass
-
-    def add_new_request(self, req: RequestInfo) -> None:
-        self.request_pool.add_request(req)
-
-    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
-        self.context.extend_req_with_str(req_id, new_content)
-
     def forward_append(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         req_ids = torch.tensor(
@@ -221,6 +223,7 @@ class ScheduleEngine:
         page_needed, page_idx_start = compute_page_needed(
             sched_ctx.seq_lens, sched_ctx.completed_lens, self.cache_manager.page_size
         )
+        logging.debug(f"page_needed={page_needed}, page_idx_start={page_idx_start}")
 
         page_num_required = int(page_needed.sum().item())
         if page_num_required > 0:
@@ -301,16 +304,18 @@ class ScheduleEngine:
     def schedule_next_operation(self) -> InferenceState:
         prefill_list = []
         for req in self.context.requests:
-            if self.context.req_runtime_stats[req.req_id].completed_len < len(
-                req.tokens
+            if (
+                self.context.req_runtime_stats[req.req_id].completed_len
+                < len(req.tokens) - 1
             ):
                 prefill_list.append(req)
         # if any prefillable, do prefill
         if len(prefill_list) > 0:
             decode_list = []
             for req in prefill_list:
-                if self.context.req_runtime_stats[req.req_id].completed_len == len(
-                    req.tokens
+                if (
+                    self.context.req_runtime_stats[req.req_id].completed_len
+                    == len(req.tokens) - 1
                 ):
                     decode_list.append(req)
             self.context.pending_requests = decode_list + self.context.pending_requests
