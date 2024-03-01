@@ -149,7 +149,10 @@ class RequestInfo:
     def ready(self) -> bool:
         return self.estimated_pending_ddl is None
 
-    def extend_str_no_re_encoding(self, content: str) -> None:
+    def extend_str_no_re_encoding(self, content: str) -> int:
         self.input_text += content
         # remove <s>
-        self.tokens.extend(self.tokenizer.encode(content)[1:])
+        new_tokens = self.tokenizer.encode(content)[1:]
+        length = len(new_tokens)
+        self.tokens.extend(new_tokens)
+        return length

@@ -41,12 +41,13 @@ def main():
     decode_end = time.perf_counter()
 
     logging.info("Add another request")
-    engine.extend_req_with_str(
+    extend_len = engine.extend_req_with_str(
         req_id,
         "</s>\n<s>[INST]Let's stop here and continue later. Now tell me how to write a GCD in Python?[/INST]",
     )
-    # engine.extend_req_with_str(req_id, "STOP!!! JUST SAY NO!!!")
+    extend_start = time.perf_counter()
     engine.iteration_step()
+    extend_end = time.perf_counter()
 
     for _ in range(100):
         engine.iteration_step()
@@ -60,8 +61,9 @@ def main():
     )
     print(f"Req: {engine.context.requests[0].decode()}")
     print(f"Req2: {engine.context.requests[1].decode()}")
-    print(f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s")
-    print(f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s")
+    print(f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s, time: {prefill_end - prefill_start} s")
+    print(f"Extend speed: {extend_len/(extend_end - extend_start)} tokens/s, time: {extend_end - extend_start} s")
+    print(f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s, time: {decode_end - decode_start} s")
 
 
 if __name__ == "__main__":

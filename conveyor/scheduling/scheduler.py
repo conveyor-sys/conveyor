@@ -83,13 +83,13 @@ class SchedulerContext:
         self.seq_lens.add_(1)
 
     # Extend the request with string appended to the end
-    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
+    def extend_req_with_str(self, req_id: int, new_content: str) -> int:
         for idx, req in enumerate(self.requests):
             if req.req_id == req_id:
-                req.extend_str_no_re_encoding(new_content)
+                length = req.extend_str_no_re_encoding(new_content)
                 self.seq_lens[idx] = len(req.tokens)
                 self.req_runtime_stats[req.req_id].seq_len = len(req.tokens)
-                return
+                return length
         logging.warning(f"Request {req_id} not found")
 
     def _recompute_batch_state(self) -> None:
@@ -188,8 +188,8 @@ class ScheduleEngine:
         self.request_pool.add_request(req)
 
     @torch.inference_mode()
-    def extend_req_with_str(self, req_id: int, new_content: str) -> None:
-        self.context.extend_req_with_str(req_id, new_content)
+    def extend_req_with_str(self, req_id: int, new_content: str) -> int:
+        return self.context.extend_req_with_str(req_id, new_content)
 
     @torch.inference_mode()
     def iteration_step(self):
