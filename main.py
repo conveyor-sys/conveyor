@@ -50,6 +50,11 @@ def main():
     engine.iteration_step()
     extend_end = time.perf_counter()
 
+    for _ in range(20):
+        engine.iteration_step()
+    
+    req3_id = engine.request_pool.add_request("[INST]How does operating system do scheduling? [/INST]")
+
     for _ in range(100):
         engine.iteration_step()
 
@@ -60,8 +65,8 @@ def main():
     logging.info(
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
-    logging.info(f"Req: {engine.context.requests[0].decode()}")
-    logging.info(f"Req2: {engine.context.requests[1].decode()}")
+    for i in range(3):
+        logging.info(f"Req{engine.context.requests[i].req_id}: {engine.context.requests[i].decode()}")
     logging.info(
         f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s, time: {prefill_end - prefill_start} s"
     )
