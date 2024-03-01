@@ -74,12 +74,13 @@ class SchedulerContext:
     def update_req(self, logits: torch.Tensor) -> None:
         assert len(logits) == len(self.requests)
         for i, req in enumerate(self.requests):
+            req.tokens.append(logits[i].item())
             self.req_runtime_stats[req.req_id].completed_len = self.req_runtime_stats[
                 req.req_id
             ].seq_len
-            self.req_runtime_stats[req.req_id].seq_len += 1
-            req.tokens.append(logits[i].item())
+            self.req_runtime_stats[req.req_id].seq_len = len(req.tokens)
         self.completed_lens = self.seq_lens.clone()
+        self.seq_lens.add_(1)
 
     # Extend the request with string appended to the end
     def extend_req_with_str(self, req_id: int, new_content: str) -> None:
@@ -192,7 +193,8 @@ class ScheduleEngine:
 
     @torch.inference_mode()
     def iteration_step(self):
-        if self.new_request_available():
+        while self.new_request_available():
+            # TODO: more than one request can be added
             new_request = self.request_pool.pop_request()
             logging.info(f"Scheduler: new request={new_request.req_id}")
             self.context.add_active_request(new_request)
@@ -210,32 +212,42 @@ class ScheduleEngine:
         self.context.update_req(result)
         return result
 
+    def prepare_kv_page(
+        req_ids: torch.Tensor, sched_ctx: SchedulerContext, cache_manager: CacheManager
+    ) -> None:
+        # calculate how many pages to allocate
+        page_needed, page_idx_start = compute_page_needed(
+            sched_ctx.seq_lens, sched_ctx.completed_lens, cache_manager.page_size
+        )
+        # logging.debug(f"page_needed={page_needed}, page_idx_start={page_idx_start}")
+
+        page_num_required = int(page_needed.sum().item())
+        if page_num_required > 0:
+            new_page_idx = cache_manager.alloc_pages(page_num_required).int()
+            if new_page_idx is None:
+                raise RuntimeError("No free pages")
+            range_idx = torch.zeros(
+                (page_needed.size(0) + 1,), dtype=torch.int64, device="cpu"
+            )
+            range_idx[1:] = page_needed.cumsum(dim=0)
+            logging.debug(
+                f"Allocated pages: new_page_idx={new_page_idx}, range_idx={range_idx}"
+            )
+            for i in range(page_needed.size(0)):
+                cache_manager.req_page_mapping[
+                    req_ids[i],
+                    page_idx_start[i] : (
+                        page_idx_start[i] + range_idx[i + 1] - range_idx[i]
+                    ),
+                ] = new_page_idx[range_idx[i] : range_idx[i + 1]]
+
     def forward_append(self, sched_ctx: SchedulerContext) -> None:
         self.manage_memory()
         req_ids = torch.tensor(
             [req.req_id for req in sched_ctx.requests], device="cuda"
         )
 
-        # calculate how many pages to allocate
-        page_needed, page_idx_start = compute_page_needed(
-            sched_ctx.seq_lens, sched_ctx.completed_lens, self.cache_manager.page_size
-        )
-        logging.debug(f"page_needed={page_needed}, page_idx_start={page_idx_start}")
-
-        page_num_required = int(page_needed.sum().item())
-        if page_num_required > 0:
-            new_page_idx = self.cache_manager.alloc_pages(page_num_required).int()
-            if new_page_idx is None:
-                raise RuntimeError("No free pages")
-            range_idx = torch.zeros((page_needed.size(0) + 1,), dtype=torch.int64)
-            range_idx[1:] = page_needed.cumsum(dim=0)
-            for i in range(page_needed.size(0)):
-                self.cache_manager.req_page_mapping[
-                    req_ids[i],
-                    page_idx_start[i] : (
-                        page_idx_start[i] + range_idx[i + 1] - range_idx[i]
-                    ),
-                ] = new_page_idx[range_idx[i] : range_idx[i + 1]]
+        ScheduleEngine.prepare_kv_page(req_ids, sched_ctx, self.cache_manager)
 
         inference_ctx = InferenceContext.new(
             InferenceState.APPEND,
@@ -277,23 +289,9 @@ class ScheduleEngine:
         req_ids = torch.tensor(
             [req.req_id for req in sched_ctx.requests], dtype=torch.int64, device="cuda"
         )
+        # sched_ctx.seq_lens.add_(1)
 
-        sched_ctx.seq_lens.add_(1)
-        page_num_required = int(
-            fill_pos[fill_pos % self.cache_manager.page_size == 0]
-            .count_nonzero()
-            .item()
-        )
-        if page_num_required > 0:
-            new_page_idx = self.cache_manager.alloc_pages(page_num_required).int()
-            if new_page_idx is None:
-                raise RuntimeError("No free pages")
-            # logging.debug(
-            #     f"Allocated pages: req_ids={req_ids}, fill_pos={fill_pos}, new_page_idx={new_page_idx}"
-            # )
-            self.cache_manager.req_page_mapping[
-                req_ids, fill_pos // self.cache_manager.page_size
-            ] = new_page_idx
+        ScheduleEngine.prepare_kv_page(req_ids, sched_ctx, self.cache_manager)
 
         inference_ctx = InferenceContext.new(
             InferenceState.DECODE,

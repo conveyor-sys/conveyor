@@ -2,14 +2,13 @@ from conveyor.models.config import ModelConfig
 from conveyor.scheduling.scheduler import ScheduleEngine
 import logging
 import time
+import os
 
 logging.basicConfig(level=logging.NOTSET)
 
-
 def main():
-    # model_name = "meta/Llama-2-7b-chat-hf"
-    # model_name = "TheBloke/Llama-2-7B-Chat-GGUF"
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    # config_path = "_private/mistral.json"
     logging.info(f"Loading model {model_name}")
     engine = ScheduleEngine(ModelConfig(model_name))
     logging.info(f"Model {model_name} loaded")
@@ -17,10 +16,10 @@ def main():
     # engine.request_pool.add_request("How are you?")
     req_id = engine.request_pool.add_request(
         # "Describe the basic components of a neural network and how it can be trained"
-        "[INST]Describe the basic components of a neural network and how it can be trained.[/INST]"
+        "[INST]Describe the basic components of a neural network and how it can be trained. [/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
     )
-    req2_id = engine.request_pool.add_request("[INST]Generate a JSON .[/INST]")
+    req2_id = engine.request_pool.add_request("[INST]Generate a JSON. [/INST]")
     logging.info("Request added")
     print(engine.request_pool.queued_requests[0].tokens)
 
@@ -35,7 +34,7 @@ def main():
     )
 
     logging.info("Decode")
-    generation_num = 50
+    generation_num = 60
     decode_start = time.perf_counter()
     for _ in range(generation_num):
         engine.iteration_step()
@@ -49,7 +48,7 @@ def main():
     # engine.extend_req_with_str(req_id, "STOP!!! JUST SAY NO!!!")
     engine.iteration_step()
 
-    for _ in range(50):
+    for _ in range(100):
         engine.iteration_step()
 
     print(
