@@ -9,9 +9,9 @@ from conveyor.scheduling.request_pool import RequestPool
 from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
 import torch
 import numpy as np
-import logging
+from conveyor.utils import getLogger
 
-logging = logging.getLogger(__name__)
+logging = getLogger(__name__)
 
 
 @dataclass

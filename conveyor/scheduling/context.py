@@ -14,9 +14,9 @@ from flashinfer import (
 from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
-import logging
+from conveyor.utils import getLogger
 
-logging = logging.getLogger(__name__)
+logging = getLogger(__name__)
 
 
 class InferenceState(Enum):

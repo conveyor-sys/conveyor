@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 import torch
-import logging
+from conveyor.utils import getLogger
 
-logging = logging.getLogger("CacheManager")
+logging = getLogger("CacheManager")
 
 
 class CacheManager:

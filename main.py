@@ -1,10 +1,11 @@
 from conveyor.models.config import ModelConfig
 from conveyor.scheduling.scheduler import ScheduleEngine
-import logging
 import time
-import os
 
-logging.basicConfig(level=logging.NOTSET)
+from conveyor.utils import getLogger
+
+logging = getLogger("conveyor.main")
+
 
 def main():
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
@@ -52,18 +53,24 @@ def main():
     for _ in range(100):
         engine.iteration_step()
 
-    print(
+    logging.info(
         f"Engine CTX: requests={[r.req_id for r in engine.context.requests]}, pending={[r.req_id for r in engine.context.pending_requests]}, stats={engine.context.req_runtime_stats}"
     )
 
-    print(
+    logging.info(
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
-    print(f"Req: {engine.context.requests[0].decode()}")
-    print(f"Req2: {engine.context.requests[1].decode()}")
-    print(f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s, time: {prefill_end - prefill_start} s")
-    print(f"Extend speed: {extend_len/(extend_end - extend_start)} tokens/s, time: {extend_end - extend_start} s")
-    print(f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s, time: {decode_end - decode_start} s")
+    logging.info(f"Req: {engine.context.requests[0].decode()}")
+    logging.info(f"Req2: {engine.context.requests[1].decode()}")
+    logging.info(
+        f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s, time: {prefill_end - prefill_start} s"
+    )
+    logging.info(
+        f"Extend speed: {extend_len/(extend_end - extend_start)} tokens/s, time: {extend_end - extend_start} s"
+    )
+    logging.info(
+        f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s, time: {decode_end - decode_start} s"
+    )
 
 
 if __name__ == "__main__":
