@@ -13,17 +13,19 @@ class RequestPool:
     def _add_request(self, req: RequestInfo):
         self.queued_requests.append(req)
 
-    def add_request(self, text: str):
+    def add_request(self, text: str) -> int:
         assert len(text) > 0
+        req_id = self.req_id_cnt
         self._add_request(
             RequestInfo(
-                req_id=self.req_id_cnt,
+                req_id=req_id,
                 input_text=text,
                 tokenizer=self.tokenizer,
                 state=RequestState.PENDING,
             )
         )
         self.req_id_cnt += 1
+        return req_id
 
     def pop_request(self) -> RequestInfo:
         return self.queued_requests.pop(0)

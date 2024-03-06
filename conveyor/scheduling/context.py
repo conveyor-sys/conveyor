@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import Enum
+from enum import Enum, auto
 from typing import List, Optional
 
 import datetime
@@ -14,16 +14,15 @@ from flashinfer import (
 from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
-import logging
+from conveyor.utils import getLogger
 
-logging = logging.getLogger(__name__)
+logging = getLogger(__name__)
 
 
 class InferenceState(Enum):
-    PREFILL = 0
-    DECODE = 1
-    APPEND = 2
-    AWAIT = 3
+    DECODE = auto()
+    APPEND = auto()
+    AWAIT = auto()
 
 
 @dataclass
@@ -41,7 +40,7 @@ class InferenceContext:
     kv_indptr: torch.Tensor
     kv_page_indices: torch.Tensor
     kv_last_page_lens: torch.Tensor
-    qo_indptr: Optional[torch.Tensor]  # only used in PREFILL/APPEND state
+    qo_indptr: Optional[torch.Tensor]  # only used in APPEND state
     prefill_wrapper: Optional[BatchPrefillWithPagedKVCacheWrapper]
     decode_wrapper: Optional[BatchDecodeWithPagedKVCacheWrapper]
 
@@ -79,7 +78,7 @@ class InferenceContext:
         qo_indptr[1:] = (seq_lens - filling_start_offset).cumsum(dim=0)
 
         match state:
-            case InferenceState.PREFILL | InferenceState.APPEND:
+            case InferenceState.APPEND:
                 prefill_wrapper = BatchPrefillWithPagedKVCacheWrapper(workspace_buffer)
                 prefill_wrapper.begin_forward(
                     qo_indptr,
@@ -121,7 +120,7 @@ class InferenceContext:
         )
 
     def drop(self) -> None:
-        if self.state in {InferenceState.PREFILL, InferenceState.APPEND}:
+        if self.state is InferenceState.APPEND:
             self.prefill_wrapper.end_forward()
         else:
             self.decode_wrapper.end_forward()
@@ -141,8 +140,19 @@ class RequestInfo:
         self.input_text = input_text
         self.tokenizer = tokenizer
         self.tokens: List = tokenizer.encode(input_text)
-        self.state = state
+        # self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None
 
     def decode(self) -> str:
         return self.tokenizer.decode(self.tokens)
+
+    def ready(self) -> bool:
+        return self.estimated_pending_ddl is None
+
+    def extend_str_no_re_encoding(self, content: str) -> int:
+        self.input_text += content
+        # remove <s>
+        new_tokens = self.tokenizer.encode(content)[1:]
+        length = len(new_tokens)
+        self.tokens.extend(new_tokens)
+        return length

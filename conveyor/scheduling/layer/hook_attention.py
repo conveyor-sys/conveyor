@@ -28,8 +28,6 @@ class HookAttention(nn.Module):
         k = k.contiguous().view(-1, self.num_kv_heads, self.head_dim)
         v = v.contiguous().view(-1, self.num_kv_heads, self.head_dim)
         match context.state:
-            case InferenceState.PREFILL:
-                return self.prefill_forward(q, k, v, context)
             case InferenceState.DECODE:
                 return self.decode_forward(q, k, v, context)
             case InferenceState.APPEND:
