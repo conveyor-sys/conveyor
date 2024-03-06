@@ -72,3 +72,9 @@ class CacheManager:
         self.free_pages_cnt += (
             page_idx.size(0) if isinstance(page_idx, torch.Tensor) else 1
         )
+
+    def page_usage(self) -> (int, int):
+        """
+        return: (used, all)
+        """
+        return self.page_num - self.free_pages_cnt, self.page_num

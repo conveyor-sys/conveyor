@@ -6,6 +6,8 @@ from conveyor.utils import getLogger
 
 logging = getLogger("conveyor.main")
 
+def long_text(num: int = 50):
+    return " ".join(["me"] * num)
 
 def main():
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
@@ -34,8 +36,12 @@ def main():
         f"SchedulerContext: requests={[r.tokens for r in engine.context.requests]}, stats={engine.context.req_runtime_stats}, seq_lens={engine.context.seq_lens}, completed_lens={engine.context.completed_lens}"
     )
 
+    for _ in range(50):
+        engine.iteration_step()
+
+
     logging.info("Decode")
-    generation_num = 60
+    generation_num = 120
     decode_start = time.perf_counter()
     for _ in range(generation_num):
         engine.iteration_step()
@@ -46,6 +52,10 @@ def main():
         req_id,
         "</s>\n<s>[INST]Let's stop here and continue later. Now tell me how to write a GCD in Python?[/INST]",
     )
+    # extend_len = engine.extend_req_with_str(
+    #     req_id,
+    #     long_text(1024)
+    # )
     extend_start = time.perf_counter()
     engine.iteration_step()
     extend_end = time.perf_counter()
@@ -55,7 +65,10 @@ def main():
     
     req3_id = engine.request_pool.add_request("[INST]How does operating system do scheduling? [/INST]")
 
-    for _ in range(100):
+    extra_rounds = 100
+    for i in range(extra_rounds):
+        if i % 100 == 0:
+            logging.info(f"Extra: {i/extra_rounds*100:.2f}%")
         engine.iteration_step()
 
     logging.info(
@@ -71,11 +84,13 @@ def main():
         f"Prefill speed: {prefill_len/(prefill_end - prefill_start)} tokens/s, time: {prefill_end - prefill_start} s"
     )
     logging.info(
-        f"Extend speed: {extend_len/(extend_end - extend_start)} tokens/s, time: {extend_end - extend_start} s"
+        f"Extend speed: {extend_len/(extend_end - extend_start)} tokens/s, time: {extend_end - extend_start} s (len={extend_len})"
     )
     logging.info(
         f"Decode speed: {generation_num/(decode_end - decode_start)} tokens/s, time: {decode_end - decode_start} s"
     )
+    page_used, page_all = engine.context.cache_manager.page_usage()
+    logging.info(f"KV Cache usage: {page_used/page_all*100:.2f}%")
 
 
 if __name__ == "__main__":

@@ -230,9 +230,9 @@ class ScheduleEngine:
                 (page_needed.size(0) + 1,), dtype=torch.int64, device="cpu"
             )
             range_idx[1:] = page_needed.cumsum(dim=0)
-            logging.debug(
-                f"Allocated pages: new_page_idx={new_page_idx}, range_idx={range_idx}"
-            )
+            # logging.debug(
+            #     f"Allocated pages: new_page_idx={new_page_idx}, range_idx={range_idx}"
+            # )
             for i in range(page_needed.size(0)):
                 cache_manager.req_page_mapping[
                     req_ids[i],
