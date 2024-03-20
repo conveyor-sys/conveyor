@@ -104,6 +104,40 @@ class SchedulerContext:
             device="cuda",
         )
 
+    def _req_in_pending(self, req_id: int) -> bool:
+        for req in self.pending_requests:
+            if req.req_id == req_id:
+                return True
+        return False
+
+    def page_used_by(self, req_id: int) -> int:
+        page_cnt = (
+            self.req_runtime_stats[req_id].completed_len // self.cache_manager.page_size
+        )
+        if (
+            self.req_runtime_stats[req_id].completed_len % self.cache_manager.page_size
+            != 0
+        ):
+            page_cnt += 1
+        return page_cnt
+
+    def drop_kv_cache(self, req_id: int, drop_page_num: int) -> None:
+        if not self._req_in_pending(req_id):
+            raise RuntimeError(f"Request {req_id} is not in pending state")
+
+        for req in self.requests:
+            if req.req_id == req_id:
+                break
+        page_cnt = self.page_used_by(req_id)
+        drop_page_idx = self.cache_manager.req_page_mapping[
+            req_id, drop_page_num:page_cnt
+        ]
+        self.cache_manager.free_pages(drop_page_idx)
+        # update stats
+        self.req_runtime_stats[req_id].completed_len = (
+            page_cnt - drop_page_num
+        ) * self.cache_manager.page_size
+
 
 def compute_page_needed(
     seq_lens: torch.Tensor, completed_lens: torch.Tensor, page_size: int
@@ -181,7 +215,21 @@ class ScheduleEngine:
         )
 
     def manage_memory(self) -> None:
-        pass
+        used, total = self.context.cache_manager.page_usage()
+        if used / total > 0.9:
+            logging.warning(f"Memory usage: {used}/{total}")
+            evicted_page = 0
+            for req in self.context.pending_requests:
+                if req.estimated_pending_ddl is not None:
+                    # leave 10 pages at max
+                    req_page = self.context.page_used_by(req.req_id)
+                    if req_page > 10:
+                        p = req_page - 10
+                        self.context.drop_kv_cache(req.req_id, p)
+                        evicted_page += p
+            logging.warning(
+                f"Evicted {evicted_page} pages. Current usage: {used}/{total}"
+            )
 
     @torch.inference_mode()
     def add_new_request(self, req: RequestInfo) -> None:
@@ -192,7 +240,7 @@ class ScheduleEngine:
         return self.context.extend_req_with_str(req_id, new_content)
 
     @torch.inference_mode()
-    def iteration_step(self):
+    def iteration_step(self, remove_finished: bool = True) -> list[RequestInfo]:
         while self.new_request_available():
             # TODO: more than one request can be added
             new_request = self.request_pool.pop_request()
@@ -210,7 +258,11 @@ class ScheduleEngine:
                 return
         result = self.sample_logits(logits)
         self.context.update_req(result)
-        return result
+        if remove_finished:
+            finished = self.remove_finished(result)
+            return finished
+        else:
+            return []
 
     def prepare_kv_page(
         req_ids: torch.Tensor, sched_ctx: SchedulerContext, cache_manager: CacheManager
@@ -348,3 +400,26 @@ class ScheduleEngine:
                 )
                 self.context._recompute_batch_state()
             return InferenceState.DECODE
+
+    def remove_finished(self, logits: torch.Tensor) -> list[RequestInfo]:
+        finished = []
+        # check eos in logits and remove finished requests
+        for i, req in enumerate(self.context.requests):
+            # </s> or <|stop|>
+            if logits[i] == self.tokenizer.eos_token_id or logits[i] == 32003:
+                finished.append(req)
+                self.context.req_runtime_stats.pop(req.req_id)
+
+        if len(finished) > 0:
+            # remove finished requests
+            new_requests = []
+            removed_ids = [req.req_id for req in finished]
+            for req in self.context.requests:
+                if req.req_id not in removed_ids:
+                    new_requests.append(req)
+            self.context.requests = new_requests
+            self.context._recompute_batch_state()
+            logging.debug(
+                f"Finished: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+            )
+        return finished
