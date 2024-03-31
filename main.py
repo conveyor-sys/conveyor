@@ -17,12 +17,13 @@ def main():
     model_name = "meetkai/functionary-small-v2.2"
     engine = ScheduleEngine(ModelConfig(model_name))
     logging.info(f"Model {model_name} loaded")
-    engine.request_pool.add_request(
+    req_id = engine.request_pool.add_request(
         # "Describe the basic components of a neural network and how it can be trained"
         # "[INST]Describe the basic components of a neural network and how it can be trained. [/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
         generate_functionary_input() + "\n<|from|> assistant\n<|recipient|>"
     )
+    engine.request_pool.queued_requests[0].parser.buffer.append(32001)
     i = 0
     finished = None
     while i < 500:

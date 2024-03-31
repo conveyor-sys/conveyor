@@ -14,6 +14,7 @@ from flashinfer import (
 from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
+from conveyor.scheduling.parsing import FunctionaryParser
 from conveyor.utils import getLogger
 
 logging = getLogger(__name__)
@@ -142,6 +143,14 @@ class RequestInfo:
         self.tokens: List = tokenizer.encode(input_text)
         # self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None
+
+        self.parser = FunctionaryParser(tokenizer)
+
+    def evaluate_parser(self, token: int):
+        tokens = self.parser.enqueue(token)
+        if tokens is not None:
+            print(f"::: Evaluate Raw: !!@ {tokens} @!!")
+            print(f"::: Evaluate Decoded: !!@ {self.tokenizer.decode(tokens)} @!!")
 
     def decode(self) -> str:
         return self.tokenizer.decode(self.tokens)

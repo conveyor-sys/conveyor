@@ -75,10 +75,12 @@ class SchedulerContext:
         assert len(logits) == len(self.requests)
         for i, req in enumerate(self.requests):
             req.tokens.append(logits[i].item())
+            req.evaluate_parser(logits[i].item())
             self.req_runtime_stats[req.req_id].completed_len = self.req_runtime_stats[
                 req.req_id
             ].seq_len
             self.req_runtime_stats[req.req_id].seq_len = len(req.tokens)
+
         self.completed_lens = self.seq_lens.clone()
         self.seq_lens.add_(1)
 
