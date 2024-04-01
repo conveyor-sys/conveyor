@@ -136,7 +136,7 @@ class RequestState(Enum):
 
 
 class RequestInfo:
-    def __init__(self, req_id: int, input_text: str, tokenizer, state: RequestState):
+    def __init__(self, req_id: int, input_text: str, tokenizer, callback):
         self.req_id = req_id
         self.input_text = input_text
         self.tokenizer = tokenizer
@@ -144,7 +144,7 @@ class RequestInfo:
         # self.state = state
         self.estimated_pending_ddl: Optional[datetime.datetime] = None
 
-        self.parser = FunctionaryParser(tokenizer)
+        self.parser = FunctionaryParser(tokenizer, callback)
 
     def evaluate_parser(self, token: int):
         tokens = self.parser.enqueue(token)

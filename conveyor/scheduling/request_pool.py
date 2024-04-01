@@ -1,14 +1,15 @@
 from __future__ import annotations
 from typing import List
 
-from conveyor.scheduling.context import RequestInfo, RequestState
+from conveyor.scheduling.context import RequestInfo
 
 
 class RequestPool:
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, callback):
         self.queued_requests: List[RequestInfo] = []
         self.req_id_cnt = 0
         self.tokenizer = tokenizer
+        self.callback = callback
 
     def _add_request(self, req: RequestInfo):
         self.queued_requests.append(req)
@@ -21,7 +22,7 @@ class RequestPool:
                 req_id=req_id,
                 input_text=text,
                 tokenizer=self.tokenizer,
-                state=RequestState.PENDING,
+                callback=self.callback,
             )
         )
         self.req_id_cnt += 1

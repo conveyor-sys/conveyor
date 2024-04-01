@@ -156,7 +156,7 @@ def compute_page_needed(
 
 
 class ScheduleEngine:
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig, callback):
         nccl_port = 5000
         tp_size = 1
         tp_rank = 0
@@ -202,7 +202,7 @@ class ScheduleEngine:
             layer_num=config.num_hidden_layers,
             device="cuda",
         )
-        self.request_pool = RequestPool(self.tokenizer)
+        self.request_pool = RequestPool(self.tokenizer, callback)
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new([], self.cache_manager)
 

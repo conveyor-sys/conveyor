@@ -13,15 +13,68 @@ def long_text(num: int = 50):
     return " ".join(["me"] * num)
 
 
+tools = [  # For functionary-7b-v2 we use "tools"; for functionary-7b-v1.4 we use "functions" = [{"name": "get_current_weather", "description":..., "parameters": ....}]
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    }
+                },
+                "required": ["location"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "google_search",
+            "description": "Search on Google",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query",
+                    },
+                    "site": {
+                        "type": "string",
+                        "description": "The website filter for the search, in a host form. e.g. www.google.com or en.wikipedia.org",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+]
+messages = [
+    {
+        "role": "user",
+        "content": "Show me recipes for traditional Turkish dishes in recent 10 years from reddit",
+    }
+]
+
+
 def main():
     model_name = "meetkai/functionary-small-v2.2"
-    engine = ScheduleEngine(ModelConfig(model_name))
+
+    def callback(x):
+        print(f"Callback: {x}")
+
+    engine = ScheduleEngine(ModelConfig(model_name), callback)
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
         # "Describe the basic components of a neural network and how it can be trained"
         # "[INST]Describe the basic components of a neural network and how it can be trained. [/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
-        generate_functionary_input() + "\n<|from|> assistant\n<|recipient|>"
+        generate_functionary_input(messages=messages, tools=tools)
+        + "\n<|from|> assistant\n<|recipient|>"
     )
     engine.request_pool.queued_requests[0].parser.buffer.append(32001)
     i = 0
