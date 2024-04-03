@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+from conveyor.plugin.json_parser import StreamingJsonObjParser
 
 from conveyor.utils import getLogger
 
@@ -15,9 +16,10 @@ class FunctionaryParser:
     def __init__(self, tokenizer, callback):
         self.buffer = []
         self.string = ""
-        self.left_bracket_pos = []
+        # self.left_bracket_pos = []
         self.tokenizer = tokenizer
         self.callback = callback
+        self.obj_parser = None
 
     def enqueue(self, token) -> Optional[Dict | List]:
         self.buffer.append(token)
@@ -48,12 +50,22 @@ class FunctionaryParser:
                 if new_str.startswith("▁"):
                     new_str = " " + new_str[1:]
                 self.string += new_str
-                if "{" in new_str:
-                    bracket_index = len(self.string) - len(new_str) + new_str.index("{")
-                    self.left_bracket_pos.append(bracket_index)
-                elif "}" in new_str:
-                    bracket_index = len(self.string) - len(new_str) + new_str.index("}")
-                    sub_str = self.string[self.left_bracket_pos[-1] : bracket_index + 1]
-                    self.left_bracket_pos.pop()
-                    self.callback(sub_str)
+                # if "{" in new_str:
+                #     bracket_index = len(self.string) - len(new_str) + new_str.index("{")
+                #     self.left_bracket_pos.append(bracket_index)
+                # elif "}" in new_str:
+                #     bracket_index = len(self.string) - len(new_str) + new_str.index("}")
+                #     sub_str = self.string[self.left_bracket_pos[-1] : bracket_index + 1]
+                #     self.left_bracket_pos.pop()
+                #     self.callback(sub_str)
+                for c in new_str:
+                    if self.obj_parser is None and c == "{":
+                        self.obj_parser = StreamingJsonObjParser()
+                        self.obj_parser.feed_char(c)
+                    elif self.obj_parser is not None:
+                        res = self.obj_parser.feed_char(c)
+                        if res is not None:
+                            self.callback(res)
+                        if self.obj_parser.done:
+                            self.obj_parser = None
                 return None
