@@ -6,7 +6,47 @@ from conveyor.utils import getLogger
 logging = getLogger(__name__)
 
 
-class FunctionaryParser:
+class BaseParser:
+    def enqueue(self, token) -> Optional[Dict | List]:
+        pass
+
+# For mistral
+class PythonParser(BaseParser):
+    CRLF = 13
+    def __init__(self, tokenizer, callback):
+        self.buffer = []
+        self.in_progress = False
+        self.string = ""
+        self.tokenizer = tokenizer
+        self.callback = callback
+
+    def enqueue(self, token) -> Optional[Dict | List]:
+        self.buffer.append(token)
+        match token:
+            case self.CRLF:
+                buf = None
+                if self.string == "```python":
+                    self.in_progress = True
+                if self.in_progress:
+                    self.callback(self.string)
+                    buf = self.buffer[:-1]
+                if self.string == "```":
+                    self.in_progress = False
+                self.buffer = []
+                self.string = ""
+                # print(f"The string is: ::>{self.string}<::")
+                return buf
+            case _:
+                new_str: str = self.tokenizer.convert_ids_to_tokens(token)
+                if not isinstance(new_str, str):
+                    new_str = new_str.decode("utf-8", errors="ignore")
+                if new_str.startswith("▁"):
+                    new_str = " " + new_str[1:]
+                self.string += new_str
+                return None
+
+
+class FunctionaryParser(BaseParser):
     CONTENT = 32000
     RECIPIENT = 32001
     FROM = 32002

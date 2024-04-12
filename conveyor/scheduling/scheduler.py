@@ -5,6 +5,7 @@ from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
+from conveyor.scheduling.parsing import BaseParser
 from conveyor.scheduling.request_pool import RequestPool
 from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
 import torch
@@ -156,7 +157,7 @@ def compute_page_needed(
 
 
 class ScheduleEngine:
-    def __init__(self, config: ModelConfig, callback):
+    def __init__(self, config: ModelConfig, parser_cb):
         nccl_port = 5000
         tp_size = 1
         tp_rank = 0
@@ -202,7 +203,9 @@ class ScheduleEngine:
             layer_num=config.num_hidden_layers,
             device="cuda",
         )
-        self.request_pool = RequestPool(self.tokenizer, callback)
+        self.request_pool = RequestPool(
+            self.tokenizer, parser=parser_cb(self.tokenizer)
+        )
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new([], self.cache_manager)
 

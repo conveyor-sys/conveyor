@@ -2,14 +2,15 @@ from __future__ import annotations
 from typing import List
 
 from conveyor.scheduling.context import RequestInfo
+from conveyor.scheduling.parsing import BaseParser
 
 
 class RequestPool:
-    def __init__(self, tokenizer, callback):
+    def __init__(self, tokenizer, parser: BaseParser):
         self.queued_requests: List[RequestInfo] = []
         self.req_id_cnt = 0
         self.tokenizer = tokenizer
-        self.callback = callback
+        self.parser = parser
 
     def _add_request(self, req: RequestInfo):
         self.queued_requests.append(req)
@@ -22,7 +23,7 @@ class RequestPool:
                 req_id=req_id,
                 input_text=text,
                 tokenizer=self.tokenizer,
-                callback=self.callback,
+                parser=self.parser,
             )
         )
         self.req_id_cnt += 1

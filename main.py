@@ -1,4 +1,5 @@
 from conveyor.models.config import ModelConfig
+from conveyor.scheduling.parsing import BaseParser, FunctionaryParser, PythonParser
 from conveyor.scheduling.scheduler import ScheduleEngine
 import time
 import json
@@ -67,7 +68,9 @@ def main():
     def callback(x):
         print(f"Callback: {x}")
 
-    engine = ScheduleEngine(ModelConfig(model_name), callback)
+    engine = ScheduleEngine(
+        ModelConfig(model_name), lambda t: FunctionaryParser(t, callback)
+    )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
         # "Describe the basic components of a neural network and how it can be trained"
@@ -91,6 +94,34 @@ def main():
 
 
 def main2():
+    def callback(x):
+        print(f"Callback: {x}")
+
+    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    logging.info(f"Loading model {model_name}")
+    engine = ScheduleEngine(
+        ModelConfig(model_name), lambda t: PythonParser(t, callback)
+    )
+    logging.info(f"Model {model_name} loaded")
+    req_id = engine.request_pool.add_request(
+        "Write a Python program for plotting a sine wave"
+    )
+    i = 0
+    start = time.perf_counter()
+    while i < 500:
+        finished = engine.iteration_step()
+        if finished:
+            break
+        i += 1
+    end = time.perf_counter()
+    if finished:
+        logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(f"Speed: {len(finished[0].tokens)/(end-start)} tokens/s")
+    else:
+        logging.info("Ongoing: " + engine.context.requests[0].decode())
+
+
+def main100():
     # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     model_name = "meetkai/functionary-small-v2.2"
     # config_path = "_private/mistral.json"
@@ -181,4 +212,4 @@ def main2():
 
 
 if __name__ == "__main__":
-    main()
+    main2()
