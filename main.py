@@ -1,4 +1,5 @@
 from conveyor.models.config import ModelConfig
+from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.parsing import BaseParser, FunctionaryParser, PythonParser
 from conveyor.scheduling.scheduler import ScheduleEngine
 import time
@@ -94,14 +95,9 @@ def main():
 
 
 def main2():
-    def callback(id, x):
-        print(f"[{id}] Callback: {x}")
-
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
-    engine = ScheduleEngine(
-        ModelConfig(model_name), lambda t, id: PythonParser(t, id, callback)
-    )
+    engine = ScheduleEngine(ModelConfig(model_name), PythonParser, PluginScheduler())
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
         "Write a Python program for plotting a sine wave"

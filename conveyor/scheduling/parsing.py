@@ -15,12 +15,14 @@ class BaseParser:
 class PythonParser(BaseParser):
     CRLF = 13
 
-    def __init__(self, tokenizer, client_id, callback):
+    def __init__(self, tokenizer, client_id, start_cb, update_cb, finish_cb):
         self.buffer = []
         self.in_progress = False
         self.string = ""
         self.tokenizer = tokenizer
-        self.callback = callback
+        self.start_cb = start_cb
+        self.update_cb = update_cb
+        self.finish_cb = finish_cb
         self.client_id = client_id
 
     def enqueue(self, token) -> Optional[Dict | List]:
@@ -29,11 +31,13 @@ class PythonParser(BaseParser):
             case self.CRLF:
                 buf = None
                 if self.string == "```python":
+                    self.start_cb(self.client_id, "python")
                     self.in_progress = True
                 if self.in_progress:
-                    self.callback(self.client_id, self.string)
+                    self.update_cb(self.client_id, self.string)
                     buf = self.buffer[:-1]
                 if self.string == "```":
+                    self.finish_cb(self.client_id)
                     self.in_progress = False
                 self.buffer = []
                 self.string = ""
@@ -56,12 +60,14 @@ class FunctionaryParser(BaseParser):
     STOP = 32003
     CRLF = 13
 
-    def __init__(self, tokenizer, client_id, callback):
+    def __init__(self, tokenizer, client_id, start_cb, update_cb, finish_cb):
         self.buffer = []
         self.string = ""
         # self.left_bracket_pos = []
         self.tokenizer = tokenizer
-        self.callback = callback
+        self.start_cb = start_cb
+        self.update_cb = update_cb
+        self.finish_cb = finish_cb
         self.obj_parser = None
         self.client_id = client_id
 
@@ -94,22 +100,19 @@ class FunctionaryParser(BaseParser):
                 if new_str.startswith("▁"):
                     new_str = " " + new_str[1:]
                 self.string += new_str
-                # if "{" in new_str:
-                #     bracket_index = len(self.string) - len(new_str) + new_str.index("{")
-                #     self.left_bracket_pos.append(bracket_index)
-                # elif "}" in new_str:
-                #     bracket_index = len(self.string) - len(new_str) + new_str.index("}")
-                #     sub_str = self.string[self.left_bracket_pos[-1] : bracket_index + 1]
-                #     self.left_bracket_pos.pop()
-                #     self.callback(sub_str)
                 for c in new_str:
                     if self.obj_parser is None and c == "{":
+                        raise NotImplementedError(
+                            "FunctionaryParser: function name not implemented"
+                        )
+                        self.start_cb(self.client_id, "#TODO")
                         self.obj_parser = StreamingJsonObjParser()
                         self.obj_parser.feed_char(c)
                     elif self.obj_parser is not None:
                         res = self.obj_parser.feed_char(c)
                         if res is not None:
-                            self.callback(self.client_id, res)
+                            self.update_cb(self.client_id, res)
+                            self.finish_cb(self.client_id)
                         if self.obj_parser.done:
                             self.obj_parser = None
                 return None

@@ -3,6 +3,7 @@ from typing import Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
+from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
 from conveyor.scheduling.request_pool import RequestPool
@@ -156,7 +157,9 @@ def compute_page_needed(
 
 
 class ScheduleEngine:
-    def __init__(self, config: ModelConfig, parser_cb):
+    def __init__(
+        self, config: ModelConfig, parser_cls, plugin_scheduler: PluginScheduler
+    ):
         nccl_port = 5000
         tp_size = 1
         tp_rank = 0
@@ -202,7 +205,17 @@ class ScheduleEngine:
             layer_num=config.num_hidden_layers,
             device="cuda",
         )
-        self.request_pool = RequestPool(self.tokenizer, parser_cb=parser_cb)
+        self.plugin_scheduler = plugin_scheduler
+        self.request_pool = RequestPool(
+            self.tokenizer,
+            lambda tokenizer, id: parser_cls(
+                tokenizer,
+                id,
+                lambda id, plugin_name: plugin_scheduler.start_plugin(id, plugin_name),
+                lambda id, dat: plugin_scheduler.process_new_data(id, dat),
+                lambda id: plugin_scheduler.finish_plugin(id),
+            ),
+        )
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new([], self.cache_manager)
 
@@ -260,11 +273,19 @@ class ScheduleEngine:
                 return
         result = self.sample_logits(logits)
         self.context.update_req(result)
+        self.poll_plugin()
         if remove_finished:
             finished = self.remove_finished(result)
             return finished
         else:
             return []
+
+    def poll_plugin(self) -> None:
+        keys = list(self.plugin_scheduler.waiting_queue.keys())
+        for k in keys:
+            res = self.plugin_scheduler.poll_finished(k)
+            if res is not None:
+                logging.debug(f"Plugin {k} finished: {res[0]}")
 
     def prepare_kv_page(
         req_ids: torch.Tensor, sched_ctx: SchedulerContext, cache_manager: CacheManager

@@ -12,17 +12,18 @@ class PythonPlugin(BasePlugin):
         super().__init__()
         self.old_stdout = sys.stdout
         self.new_stdout = StringIO()
+        self.global_vars = {}
         sys.stdout = self.new_stdout
 
     def process_new_dat(self, data: str):
         if data.startswith("```python"):
-            logging.debug("PythonPlugin: Executing python code")
+            print("PythonPlugin: Executing python code", file=sys.stderr)
             return None
         elif data.strip() == "```":
-            logging.debug("PythonPlugin: Finished executing python code")
+            print("PythonPlugin: Finished python code", file=sys.stderr)
             return None
         try:
-            exec(data)
+            exec(data, self.global_vars)
             return None
         except Exception as e:
             return e

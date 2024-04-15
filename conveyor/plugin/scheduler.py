@@ -1,23 +1,29 @@
-from typing import Dict
+from typing import Dict, List, Optional
 
 import multiprocessing as mp
 import sys
+import os
+import time
 from multiprocessing.connection import Connection
 
 from conveyor.plugin.base_plugin import BasePlugin
 from conveyor.plugin.python_plugin import PythonPlugin
 from conveyor.plugin.search_plugin import SearchPlugin
 
+from conveyor.utils import getLogger
+
+logging = getLogger(__name__)
+
 
 finish_str = "@[finish]"
 
 
-def plugin_loop(plugin: BasePlugin, pipe_in: Connection, pipe_out: Connection):
+def plugin_loop(plugin: BasePlugin, ep: Connection):
     print("Starting plugin loop", file=sys.stderr)
     while True:
-        data = pipe_in.recv()
+        data = ep.recv()
         if data == finish_str:
-            pipe_out.send(plugin.finish())
+            ep.send(plugin.finish())
             return
         err = plugin.process_new_dat(data)
         if err is not None:
@@ -27,19 +33,17 @@ def plugin_loop(plugin: BasePlugin, pipe_in: Connection, pipe_out: Connection):
 
 class PluginInstance:
     def __init__(self, plugin: BasePlugin) -> None:
-        sending_pipe, receiving_pipe = mp.Pipe()
-        self.process = mp.Process(
-            target=plugin_loop, args=(plugin, sending_pipe, receiving_pipe)
-        )
-        self.sending_pipe = sending_pipe
-        self.receiving_pipe = receiving_pipe
+        local_ep, plugin_ep = mp.Pipe()
+        self.local_pipe = local_ep
+        self.process = mp.Process(target=plugin_loop, args=(plugin, plugin_ep))
         self.process.start()
+        logging.debug(f"[PluginInstance] Process started: {self.process.pid}")
 
 
 class PluginScheduler:
     def __init__(self) -> None:
         self.plugin_map: Dict[str, PluginInstance] = {}
-        self.waiting_queue = {}
+        self.waiting_queue: Dict[str, PluginInstance] = {}
         pass
 
     def start_plugin(self, client_id: str, plugin_name: str):
@@ -47,8 +51,10 @@ class PluginScheduler:
         match plugin_name:
             case "python":
                 plugin = PythonPlugin()
+                logging.debug(f"[PluginScheduler:{client_id}] Starting python plugin")
             case "search":
                 plugin = SearchPlugin()
+                logging.debug(f"[PluginScheduler:{client_id}] Starting search plugin")
             case _:
                 raise ValueError("Invalid plugin name")
         self.plugin_map[client_id] = PluginInstance(plugin)
@@ -57,16 +63,24 @@ class PluginScheduler:
     def process_new_data(self, client_id: str, data: str):
         plugin = self.plugin_map.get(client_id)
         assert plugin is not None
-        plugin.sending_pipe.send(data)
+        plugin.local_pipe.send(data)
 
     def finish_plugin(self, client_id: str):
         plugin = self.plugin_map.get(client_id)
+        logging.debug(f"[PluginScheduler:{client_id}] Finishing plugin")
         assert plugin is not None
-        plugin.sending_pipe.send(finish_str)
+        plugin.local_pipe.send(finish_str)
+        self.waiting_queue[client_id] = plugin
+        del self.plugin_map[client_id]
 
-    def poll_finished(self, client_id: str):
-        plugin = self.plugin_map.get(client_id)
+    def poll_finished(self, client_id: str) -> Optional[List]:
+        plugin = self.waiting_queue.get(client_id)
         assert plugin is not None
-        if plugin.receiving_pipe.poll():
-            return plugin.receiving_pipe.recv()
+        if plugin.local_pipe.poll():
+            res = plugin.local_pipe.recv()
+            logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
+            plugin.process.join()
+            logging.debug(f"[PluginScheduler:{client_id}] Process joined")
+            del self.waiting_queue[client_id]
+            return [res]
         return None
