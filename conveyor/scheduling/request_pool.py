@@ -6,11 +6,11 @@ from conveyor.scheduling.parsing import BaseParser
 
 
 class RequestPool:
-    def __init__(self, tokenizer, parser: BaseParser):
+    def __init__(self, tokenizer, parser_cb):
         self.queued_requests: List[RequestInfo] = []
         self.req_id_cnt = 0
         self.tokenizer = tokenizer
-        self.parser = parser
+        self.parser_cb = parser_cb
 
     def _add_request(self, req: RequestInfo):
         self.queued_requests.append(req)
@@ -23,7 +23,7 @@ class RequestPool:
                 req_id=req_id,
                 input_text=text,
                 tokenizer=self.tokenizer,
-                parser=self.parser,
+                parser=self.parser_cb(self.tokenizer, req_id),
             )
         )
         self.req_id_cnt += 1

@@ -65,11 +65,11 @@ messages = [
 def main():
     model_name = "meetkai/functionary-small-v2.2"
 
-    def callback(x):
-        print(f"Callback: {x}")
+    def callback(id, x):
+        print(f"[{id}] Callback: {x}")
 
     engine = ScheduleEngine(
-        ModelConfig(model_name), lambda t: FunctionaryParser(t, callback)
+        ModelConfig(model_name), lambda t, id: FunctionaryParser(t, id, callback)
     )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
@@ -94,13 +94,13 @@ def main():
 
 
 def main2():
-    def callback(x):
-        print(f"Callback: {x}")
+    def callback(id, x):
+        print(f"[{id}] Callback: {x}")
 
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
     engine = ScheduleEngine(
-        ModelConfig(model_name), lambda t: PythonParser(t, callback)
+        ModelConfig(model_name), lambda t, id: PythonParser(t, id, callback)
     )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(

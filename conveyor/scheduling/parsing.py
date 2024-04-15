@@ -15,12 +15,13 @@ class BaseParser:
 class PythonParser(BaseParser):
     CRLF = 13
 
-    def __init__(self, tokenizer, callback):
+    def __init__(self, tokenizer, client_id, callback):
         self.buffer = []
         self.in_progress = False
         self.string = ""
         self.tokenizer = tokenizer
         self.callback = callback
+        self.client_id = client_id
 
     def enqueue(self, token) -> Optional[Dict | List]:
         self.buffer.append(token)
@@ -30,7 +31,7 @@ class PythonParser(BaseParser):
                 if self.string == "```python":
                     self.in_progress = True
                 if self.in_progress:
-                    self.callback(self.string)
+                    self.callback(self.client_id, self.string)
                     buf = self.buffer[:-1]
                 if self.string == "```":
                     self.in_progress = False
@@ -55,13 +56,14 @@ class FunctionaryParser(BaseParser):
     STOP = 32003
     CRLF = 13
 
-    def __init__(self, tokenizer, callback):
+    def __init__(self, tokenizer, client_id, callback):
         self.buffer = []
         self.string = ""
         # self.left_bracket_pos = []
         self.tokenizer = tokenizer
         self.callback = callback
         self.obj_parser = None
+        self.client_id = client_id
 
     def enqueue(self, token) -> Optional[Dict | List]:
         self.buffer.append(token)
@@ -107,7 +109,7 @@ class FunctionaryParser(BaseParser):
                     elif self.obj_parser is not None:
                         res = self.obj_parser.feed_char(c)
                         if res is not None:
-                            self.callback(res)
+                            self.callback(self.client_id, res)
                         if self.obj_parser.done:
                             self.obj_parser = None
                 return None

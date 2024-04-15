@@ -5,7 +5,6 @@ from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
 from conveyor.scheduling.cache_manager import CacheManager
 from conveyor.scheduling.context import InferenceContext, InferenceState, RequestInfo
-from conveyor.scheduling.parsing import BaseParser
 from conveyor.scheduling.request_pool import RequestPool
 from vllm.model_executor.parallel_utils.parallel_state import initialize_model_parallel
 import torch
@@ -203,9 +202,7 @@ class ScheduleEngine:
             layer_num=config.num_hidden_layers,
             device="cuda",
         )
-        self.request_pool = RequestPool(
-            self.tokenizer, parser=parser_cb(self.tokenizer)
-        )
+        self.request_pool = RequestPool(self.tokenizer, parser_cb=parser_cb)
         self.max_concurrent_requests = 16
         self.context = SchedulerContext.new([], self.cache_manager)
 
