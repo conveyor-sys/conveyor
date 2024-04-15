@@ -10,9 +10,11 @@ class BaseParser:
     def enqueue(self, token) -> Optional[Dict | List]:
         pass
 
+
 # For mistral
 class PythonParser(BaseParser):
     CRLF = 13
+
     def __init__(self, tokenizer, callback):
         self.buffer = []
         self.in_progress = False

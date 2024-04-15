@@ -2,8 +2,8 @@ class BasePlugin:
     def __init__(self):
         pass
 
-    async def process_new_arg(self, key: str, value: str):
+    def process_new_dat(self, data: str):
         raise NotImplementedError
 
-    async def finish(self):
+    def finish(self):
         raise NotImplementedError
