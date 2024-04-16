@@ -36,7 +36,7 @@ tools = [  # For functionary-7b-v2 we use "tools"; for functionary-7b-v1.4 we us
     {
         "type": "function",
         "function": {
-            "name": "google_search",
+            "name": "search",
             "description": "Search on Google",
             "parameters": {
                 "type": "object",
@@ -66,11 +66,8 @@ messages = [
 def main():
     model_name = "meetkai/functionary-small-v2.2"
 
-    def callback(id, x):
-        print(f"[{id}] Callback: {x}")
-
     engine = ScheduleEngine(
-        ModelConfig(model_name), lambda t, id: FunctionaryParser(t, id, callback)
+        ModelConfig(model_name), FunctionaryParser, PluginScheduler()
     )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
@@ -208,4 +205,4 @@ def main100():
 
 
 if __name__ == "__main__":
-    main2()
+    main()

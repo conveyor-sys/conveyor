@@ -1,6 +1,7 @@
 # Adapted from
 # https://github.com/sgl-project/sglang/blob/63ba630bbbb2d55787ac54ac0a01cbde993afc20/python/sglang/srt/models/llama2.py
 """Inference-only LLaMA model compatible with HuggingFace weights."""
+
 from typing import Any, Dict, Optional, Tuple
 
 import torch

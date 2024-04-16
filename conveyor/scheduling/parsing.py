@@ -85,9 +85,9 @@ class FunctionaryParser(BaseParser):
                     or self.buffer[0] == self.FROM
                 ):
                     if self.buffer[0] == self.RECIPIENT:
-                        logging.debug(
-                            f"Recipient: {self.tokenizer.decode(self.buffer[1:])}"
-                        )
+                        func_name = self.tokenizer.decode(self.buffer[1:]).strip()
+                        logging.debug(f"Recipient: {func_name}")
+                        self.start_cb(self.client_id, func_name)
                     buf = self.buffer
                     self.buffer = []
                     return buf
@@ -102,17 +102,14 @@ class FunctionaryParser(BaseParser):
                 self.string += new_str
                 for c in new_str:
                     if self.obj_parser is None and c == "{":
-                        raise NotImplementedError(
-                            "FunctionaryParser: function name not implemented"
-                        )
-                        self.start_cb(self.client_id, "#TODO")
+                        # TODO
                         self.obj_parser = StreamingJsonObjParser()
                         self.obj_parser.feed_char(c)
                     elif self.obj_parser is not None:
                         res = self.obj_parser.feed_char(c)
                         if res is not None:
                             self.update_cb(self.client_id, res)
-                            self.finish_cb(self.client_id)
                         if self.obj_parser.done:
+                            self.finish_cb(self.client_id)
                             self.obj_parser = None
                 return None

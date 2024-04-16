@@ -4,9 +4,9 @@ from typing import Optional
 class StreamingJsonObjParser:
     def __init__(self):
         self.current_key: Optional[str | StreamingJsonObjParser] = None
-        self.current_obj: Optional[
-            StreamingJsonObjParser | StreamingJsonObjParser
-        ] = None
+        self.current_obj: Optional[StreamingJsonObjParser | StreamingJsonObjParser] = (
+            None
+        )
         self.done = False
 
     def feed_char(self, char):

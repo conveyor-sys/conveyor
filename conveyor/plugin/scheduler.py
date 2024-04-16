@@ -56,7 +56,7 @@ class PluginScheduler:
                 plugin = SearchPlugin()
                 logging.debug(f"[PluginScheduler:{client_id}] Starting search plugin")
             case _:
-                raise ValueError("Invalid plugin name")
+                raise ValueError(f"Invalid plugin name: >>{plugin_name}<<")
         self.plugin_map[client_id] = PluginInstance(plugin)
         pass
 
