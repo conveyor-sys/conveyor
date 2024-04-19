@@ -41,19 +41,21 @@ class PluginInstance:
 
 
 class PluginScheduler:
-    def __init__(self) -> None:
+    def __init__(self, lazy: bool = False) -> None:
         self.plugin_map: Dict[str, PluginInstance] = {}
         self.waiting_queue: Dict[str, PluginInstance] = {}
+        self.join_queue = []
+        self.lazy = lazy
         pass
 
     def start_plugin(self, client_id: str, plugin_name: str):
         assert self.plugin_map.get(client_id) is None
         match plugin_name:
             case "python":
-                plugin = PythonPlugin()
+                plugin = PythonPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting python plugin")
             case "search":
-                plugin = SearchPlugin()
+                plugin = SearchPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting search plugin")
             case _:
                 raise ValueError(f"Invalid plugin name: >>{plugin_name}<<")
@@ -65,7 +67,9 @@ class PluginScheduler:
         assert plugin is not None
         plugin.local_pipe.send(data)
 
-    def finish_plugin(self, client_id: str):
+    def finish_plugin(self, client_id: str, force: bool = False):
+        if self.lazy and not force:
+            return
         plugin = self.plugin_map.get(client_id)
         logging.debug(f"[PluginScheduler:{client_id}] Finishing plugin")
         assert plugin is not None
@@ -78,9 +82,15 @@ class PluginScheduler:
         assert plugin is not None
         if plugin.local_pipe.poll():
             res = plugin.local_pipe.recv()
-            logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
-            plugin.process.join()
+            # logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
+            self.join_queue.append(plugin.process)
             logging.debug(f"[PluginScheduler:{client_id}] Process joined")
             del self.waiting_queue[client_id]
             return [res]
         return None
+
+    def join_all(self):
+        for p in self.join_queue:
+            p.join()
+        self.join_queue.clear()
+        logging.info("[PluginScheduler] All processes joined")

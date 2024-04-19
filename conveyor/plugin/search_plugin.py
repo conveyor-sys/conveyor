@@ -11,13 +11,14 @@ logging = getLogger(__name__)
 
 
 class SearchPlugin(BasePlugin):
-    def __init__(self):
+    def __init__(self, lazy: bool = False):
         super().__init__()
         self.query = None
         self.session = None
+        self.lazy = lazy
 
     def process_new_dat(self, data: dict):
-        if self.session is None:
+        if not self.lazy and self.session is None:
             self.session = requests.Session()
             self.session.get("https://www.google.com/generate_204")
         try:
@@ -32,6 +33,8 @@ class SearchPlugin(BasePlugin):
         if self.query is None:
             return None
         else:
+            if self.session is None:
+                self.session = requests.Session()
             start = time.perf_counter()
             result = search(self.session, self.query, "en", "us")
             end = time.perf_counter()

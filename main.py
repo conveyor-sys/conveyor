@@ -3,8 +3,9 @@ from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.parsing import BaseParser, FunctionaryParser, PythonParser
 from conveyor.scheduling.scheduler import ScheduleEngine
 import time
-import json
 from misc.functionary import generate_functionary_input
+from _private.access_token import set_hf_token
+
 
 from conveyor.utils import getLogger
 
@@ -63,11 +64,11 @@ messages = [
 ]
 
 
-def main():
+def eval_search():
     model_name = "meetkai/functionary-small-v2.2"
-
+    plugin_scheduler = PluginScheduler(lazy=False)
     engine = ScheduleEngine(
-        ModelConfig(model_name), FunctionaryParser, PluginScheduler()
+        ModelConfig(model_name), FunctionaryParser, plugin_scheduler
     )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
@@ -78,40 +79,72 @@ def main():
         + "\n<|from|> assistant\n<|recipient|>"
     )
     engine.request_pool.queued_requests[0].parser.buffer.append(32001)
+    init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     finished = None
+    time_start = time.perf_counter()
     while i < 500:
         finished = engine.iteration_step()
         if finished:
             break
         i += 1
+    if plugin_scheduler.lazy:
+        plugin_scheduler.finish_plugin(
+            list(plugin_scheduler.plugin_map.keys())[0], force=True
+        )
     if finished:
+        while len(plugin_scheduler.waiting_queue) > 0:
+            res = plugin_scheduler.poll_finished(
+                list(plugin_scheduler.waiting_queue.keys())[0]
+            )
+        time_end = time.perf_counter()
+        logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+        )
+        logging.info(f"Time: {time_end-time_start} s")
     else:
         logging.info("Ongoing: " + engine.context.requests[0].decode())
+    plugin_scheduler.join_all()
 
 
-def main2():
+def eval_python():
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
-    engine = ScheduleEngine(ModelConfig(model_name), PythonParser, PluginScheduler())
+    plugin_scheduler = PluginScheduler(lazy=True)
+    engine = ScheduleEngine(ModelConfig(model_name), PythonParser, plugin_scheduler)
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
         "Write a Python program for plotting a sine wave"
     )
+    init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
-    start = time.perf_counter()
+    time_start = time.perf_counter()
     while i < 500:
         finished = engine.iteration_step()
         if finished:
             break
         i += 1
-    end = time.perf_counter()
+    if plugin_scheduler.lazy:
+        plugin_scheduler.finish_plugin(
+            list(plugin_scheduler.plugin_map.keys())[0], force=True
+        )
     if finished:
+        while len(plugin_scheduler.waiting_queue) > 0:
+            res = plugin_scheduler.poll_finished(
+                list(plugin_scheduler.waiting_queue.keys())[0]
+            )
+        time_end = time.perf_counter()
         logging.info(f"Finished: {finished[0].decode()}")
-        logging.info(f"Speed: {len(finished[0].tokens)/(end-start)} tokens/s")
+        logging.info(
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
+        )
+        logging.info(f"Time: {time_end - time_start} s")
+
     else:
         logging.info("Ongoing: " + engine.context.requests[0].decode())
+    plugin_scheduler.join_all()
 
 
 def main100():
@@ -205,4 +238,5 @@ def main100():
 
 
 if __name__ == "__main__":
-    main()
+    set_hf_token()
+    eval_search()
