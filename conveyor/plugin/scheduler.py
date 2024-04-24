@@ -6,7 +6,7 @@ import os
 import time
 from multiprocessing.connection import Connection
 
-from conveyor.plugin.base_plugin import BasePlugin
+from conveyor.plugin.base_plugin import BasePlugin, PlaceholderPlugin
 from conveyor.plugin.python_plugin import PythonPlugin
 from conveyor.plugin.search_plugin import SearchPlugin
 
@@ -43,7 +43,7 @@ class PluginInstance:
 class PluginScheduler:
     def __init__(self, lazy: bool = False) -> None:
         self.plugin_map: Dict[str, PluginInstance] = {}
-        self.waiting_queue: Dict[str, PluginInstance] = {}
+        self.waiting_queue: Dict[str, List[PluginInstance]] = {}
         self.join_queue = []
         self.lazy = lazy
         pass
@@ -58,7 +58,10 @@ class PluginScheduler:
                 plugin = SearchPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting search plugin")
             case _:
-                raise ValueError(f"Invalid plugin name: >>{plugin_name}<<")
+                plugin = PlaceholderPlugin()
+                logging.warn(
+                    f"[PluginScheduler:{client_id}] Starting placeholder plugin"
+                )
         self.plugin_map[client_id] = PluginInstance(plugin)
         pass
 
