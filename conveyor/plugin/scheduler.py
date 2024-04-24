@@ -46,6 +46,7 @@ class PluginScheduler:
         self.waiting_queue: Dict[str, List[PluginInstance]] = {}
         self.join_queue = []
         self.lazy = lazy
+        self.lazy_queue: Dict[str, List[PluginInstance]] = {}
         pass
 
     def start_plugin(self, client_id: str, plugin_name: str):
@@ -72,24 +73,46 @@ class PluginScheduler:
 
     def finish_plugin(self, client_id: str, force: bool = False):
         if self.lazy and not force:
+            plugin = self.plugin_map.get(client_id)
+            assert plugin is not None
+            if self.lazy_queue.get(client_id) is None:
+                self.lazy_queue[client_id] = []
+            self.lazy_queue[client_id].append(plugin)
+            del self.plugin_map[client_id]
             return
+        # move from working slot to waiting queue
         plugin = self.plugin_map.get(client_id)
         logging.debug(f"[PluginScheduler:{client_id}] Finishing plugin")
         assert plugin is not None
         plugin.local_pipe.send(finish_str)
-        self.waiting_queue[client_id] = plugin
+        if self.waiting_queue.get(client_id) is None:
+            self.waiting_queue[client_id] = []
+        self.waiting_queue[client_id].append(plugin)
         del self.plugin_map[client_id]
 
+    def flush_lazy(self, client_id: str):
+        if self.lazy_queue.get(client_id) is None:
+            return
+        for plugin in self.lazy_queue[client_id]:
+            plugin.local_pipe.send(finish_str)
+            if self.waiting_queue.get(client_id) is None:
+                self.waiting_queue[client_id] = []
+            self.waiting_queue[client_id].append(plugin)
+        del self.lazy_queue[client_id]
+
     def poll_finished(self, client_id: str) -> Optional[List]:
-        plugin = self.waiting_queue.get(client_id)
-        assert plugin is not None
-        if plugin.local_pipe.poll():
-            res = plugin.local_pipe.recv()
-            # logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
-            self.join_queue.append(plugin.process)
-            logging.debug(f"[PluginScheduler:{client_id}] Process joined")
-            del self.waiting_queue[client_id]
-            return [res]
+        plugin_list = self.waiting_queue.get(client_id)
+        assert plugin_list is not None
+        for plugin in plugin_list:
+            if plugin.local_pipe.poll():
+                res = plugin.local_pipe.recv()
+                # logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
+                self.join_queue.append(plugin.process)
+                logging.debug(f"[PluginScheduler:{client_id}] Process joined")
+                plugin_list.remove(plugin)
+                if plugin_list == []:
+                    del self.waiting_queue[client_id]
+                return [res]
         return None
 
     def join_all(self):

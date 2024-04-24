@@ -56,12 +56,6 @@ tools = [  # For functionary-7b-v2 we use "tools"; for functionary-7b-v1.4 we us
         },
     },
 ]
-messages = [
-    {
-        "role": "user",
-        "content": "Show me recipes for traditional Turkish dishes in recent 10 years from reddit",
-    }
-]
 
 
 def eval_weather():
@@ -111,10 +105,10 @@ def eval_weather():
         if finished:
             break
         i += 1
+
     if plugin_scheduler.lazy:
-        plugin_scheduler.finish_plugin(
-            list(plugin_scheduler.plugin_map.keys())[0], force=True
-        )
+        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+
     if finished:
         res = None
         while len(plugin_scheduler.waiting_queue) > 0:
@@ -135,7 +129,7 @@ def eval_weather():
 
 def eval_search():
     model_name = "meetkai/functionary-small-v2.2"
-    plugin_scheduler = PluginScheduler(lazy=False)
+    plugin_scheduler = PluginScheduler(lazy=True)
     engine = ScheduleEngine(
         ModelConfig(model_name), FunctionaryParser, plugin_scheduler
     )
@@ -144,7 +138,15 @@ def eval_search():
         # "Describe the basic components of a neural network and how it can be trained"
         # "[INST]Describe the basic components of a neural network and how it can be trained. [/INST]"
         # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
-        generate_functionary_input(messages=messages, tools=tools)
+        generate_functionary_input(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
+                }
+            ],
+            tools=tools,
+        )
         + "\n<|from|> assistant\n<|recipient|>"
     )
     engine.request_pool.queued_requests[0].parser.buffer.append(32001)
@@ -157,10 +159,10 @@ def eval_search():
         if finished:
             break
         i += 1
+
     if plugin_scheduler.lazy:
-        plugin_scheduler.finish_plugin(
-            list(plugin_scheduler.plugin_map.keys())[0], force=True
-        )
+        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+
     if finished:
         while len(plugin_scheduler.waiting_queue) > 0:
             res = plugin_scheduler.poll_finished(
@@ -195,10 +197,10 @@ def eval_python():
         if finished:
             break
         i += 1
+
     if plugin_scheduler.lazy:
-        plugin_scheduler.finish_plugin(
-            list(plugin_scheduler.plugin_map.keys())[0], force=True
-        )
+        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+
     if finished:
         while len(plugin_scheduler.waiting_queue) > 0:
             res = plugin_scheduler.poll_finished(
@@ -308,5 +310,4 @@ def main100():
 
 if __name__ == "__main__":
     set_hf_token()
-    # eval_search()
-    eval_weather()
+    eval_search()
