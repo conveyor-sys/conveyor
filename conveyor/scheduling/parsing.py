@@ -28,7 +28,8 @@ class PythonParser(BaseParser):
     def enqueue(self, token) -> Optional[Dict | List]:
         self.buffer.append(token)
         match token:
-            case self.CRLF:
+            # CRLF, </s> or <|STOP|>
+            case self.CRLF | self.tokenizer.eos_token_id | 32003:
                 buf = None
                 if self.string == "```python":
                     self.start_cb(self.client_id, "python")
@@ -36,7 +37,7 @@ class PythonParser(BaseParser):
                 if self.in_progress:
                     self.update_cb(self.client_id, self.string)
                     buf = self.buffer[:-1]
-                if self.string == "```":
+                if self.string == "```" or self.string.startswith("```</s>"):
                     self.finish_cb(self.client_id)
                     self.in_progress = False
                 self.buffer = []

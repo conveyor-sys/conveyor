@@ -8,6 +8,16 @@ import time
 logging = getLogger(__name__)
 
 
+def count_prefix_spaces(s):
+    count = 0
+    for char in s:
+        if char == " ":
+            count += 1
+        else:
+            break
+    return count
+
+
 class PythonPlugin(BasePlugin):
     def __init__(self, lazy: bool = False):
         super().__init__()
@@ -20,24 +30,28 @@ class PythonPlugin(BasePlugin):
         sys.stdout = self.new_stdout
 
     def process_new_dat(self, data: str):
+        data = data.replace("\u2581", " ")
         if data.startswith("```python"):
             print("PythonPlugin: Executing python code", file=sys.stderr)
             return None
-        elif data.strip() == "```":
+        elif data.strip().startswith("```"):
             print("PythonPlugin: Finished python code", file=sys.stderr)
             return None
         try:
-            if self.lazy:
-                self.text_buffer.append(data)
-                return None
-            else:
-                exec(data, self.global_vars)
-                return None
+            if not self.lazy and len(self.text_buffer) > 0:
+                if count_prefix_spaces(data) <= count_prefix_spaces(
+                    self.text_buffer[0]
+                ):
+                    exec("\n".join(self.text_buffer), self.global_vars)
+                    self.text_buffer = []
+            self.text_buffer.append(data)
+            return None
         except Exception as e:
             return e
 
     def finish(self):
-        if self.lazy:
+        logging.warning(f"PythonPlugin: Finishing lazy={self.lazy}")
+        if len(self.text_buffer) > 0:
             start_time = time.perf_counter()
             try:
                 exec("\n".join(self.text_buffer), self.global_vars)

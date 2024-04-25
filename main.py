@@ -180,15 +180,13 @@ def eval_search():
     plugin_scheduler.join_all()
 
 
-def eval_python():
+def eval_python(req: str, lazy: bool):
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
-    plugin_scheduler = PluginScheduler(lazy=True)
+    plugin_scheduler = PluginScheduler(lazy)
     engine = ScheduleEngine(ModelConfig(model_name), PythonParser, plugin_scheduler)
     logging.info(f"Model {model_name} loaded")
-    req_id = engine.request_pool.add_request(
-        "Write a Python program for plotting a sine wave"
-    )
+    req_id = engine.request_pool.add_request(req)
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     time_start = time.perf_counter()
@@ -310,4 +308,10 @@ def main100():
 
 if __name__ == "__main__":
     set_hf_token()
-    eval_search()
+    # eval_python("Plotting a sine wave in python. ONLY output code", lazy=False)
+    # eval_python("Plotting a sine wave in python with torch. ONLY output code without trailing explanation.", lazy=False)
+    # eval_python("Plotting a cosine wave in python with torch and matplotlib. ONLY output code without trailing explanation.", lazy=True)
+    eval_python(
+        "Plotting a sine wave in python with torch and matplotlib. ONLY output code without trailing explanation.",
+        lazy=False,
+    )

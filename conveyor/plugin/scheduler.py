@@ -116,7 +116,8 @@ class PluginScheduler:
         return None
 
     def join_all(self):
+        proc_cnt = len(self.join_queue)
         for p in self.join_queue:
             p.join()
         self.join_queue.clear()
-        logging.info("[PluginScheduler] All processes joined")
+        logging.info(f"[PluginScheduler] All {proc_cnt} processes joined")
