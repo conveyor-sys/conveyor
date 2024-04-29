@@ -269,8 +269,8 @@ class ScheduleEngine:
 
     @torch.inference_mode()
     def iteration_step(self, remove_finished: bool = True) -> list[RequestInfo]:
-        self.roundrobin_policy()
-        # self.fcfs_policy()
+        # self.roundrobin_policy()
+        self.fcfs_policy()
         next_operation = self.schedule_next_operation()
         # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:

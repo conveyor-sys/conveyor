@@ -231,9 +231,9 @@ def eval_scheduling():
     req_id = engine.request_pool.add_request(
         "List 10 famous mathematicians and their contributions."
     )
-    req_id2 = engine.request_pool.add_request(
-        "Write an email to manager about this quarter's performance in a financial company."
-    )
+    # req_id2 = engine.request_pool.add_request(
+    #     "Write an email to manager about this quarter's performance in a financial company."
+    # )
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     time_start = time.perf_counter()
@@ -253,13 +253,16 @@ def eval_scheduling():
             )
         time_end = time.perf_counter()
         logging.info(f"Finished: {finished[0].decode()}")
-        logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
-        )
-        logging.info(f"Time: {time_end - time_start} s")
-
+        final_tokens_len = len(finished[0].tokens)
     else:
+        time_end = time.perf_counter()
         logging.info("Ongoing: " + engine.context.requests[0].decode())
+        final_tokens_len = len(engine.context.requests[0].tokens)
+
+    logging.info(
+        f"Speed: {(final_tokens_len-init_tokens_len)/(time_end - time_start)} tokens/s"
+    )
+    logging.info(f"Time: {time_end - time_start} s")
     plugin_scheduler.join_all()
 
 
@@ -365,6 +368,5 @@ def good_python_example():
 
 
 if __name__ == "__main__":
-    # set_hf_token()
-    # eval_scheduling()
-    good_python_example()
+    set_hf_token()
+    eval_scheduling()
