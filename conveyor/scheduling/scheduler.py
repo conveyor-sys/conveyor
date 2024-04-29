@@ -71,6 +71,15 @@ class SchedulerContext:
         )
         logging.debug(f"Current requests: {[req.req_id for req in self.requests]}")
 
+    def add_inactive_request(self, req: RequestInfo) -> None:
+        self.pending_requests.append(req)
+        self.req_runtime_stats[req.req_id] = ReqRuntimeStat(
+            req.req_id, len(req.tokens), 0
+        )
+        logging.debug(
+            f"Current pending requests: {[req.req_id for req in self.pending_requests]}"
+        )
+
     # Update the context state after a forward pass
     def update_req(self, logits: torch.Tensor) -> None:
         assert len(logits) == len(self.requests)
@@ -158,7 +167,11 @@ def compute_page_needed(
 
 class ScheduleEngine:
     def __init__(
-        self, config: ModelConfig, parser_cls, plugin_scheduler: PluginScheduler
+        self,
+        config: ModelConfig,
+        parser_cls,
+        plugin_scheduler: PluginScheduler,
+        max_concurrent_requests: int = 16,
     ):
         nccl_port = 5000
         tp_size = 1
@@ -216,7 +229,7 @@ class ScheduleEngine:
                 lambda id: plugin_scheduler.finish_plugin(id),
             ),
         )
-        self.max_concurrent_requests = 16
+        self.max_concurrent_requests = max_concurrent_requests
         self.context = SchedulerContext.new([], self.cache_manager)
 
     def sample_logits(self, logits: torch.Tensor) -> torch.Tensor:
@@ -256,11 +269,8 @@ class ScheduleEngine:
 
     @torch.inference_mode()
     def iteration_step(self, remove_finished: bool = True) -> list[RequestInfo]:
-        while self.new_request_available():
-            # TODO: more than one request can be added
-            new_request = self.request_pool.pop_request()
-            logging.info(f"Scheduler: new request={new_request.req_id}")
-            self.context.add_active_request(new_request)
+        self.roundrobin_policy()
+        # self.fcfs_policy()
         next_operation = self.schedule_next_operation()
         # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
@@ -385,6 +395,10 @@ class ScheduleEngine:
 
         return self.model.forward(tokens, fill_pos, inference_ctx)
 
+    #   -----------------------------------------------------
+    #                   Scheduling Logic
+    #   -----------------------------------------------------
+
     def schedule_next_operation(self) -> InferenceState:
         prefill_list = []
         for req in self.context.requests:
@@ -423,6 +437,41 @@ class ScheduleEngine:
                 )
                 self.context._recompute_batch_state()
             return InferenceState.DECODE
+
+    def fcfs_policy(self) -> None:
+        while self.new_request_available():
+            # TODO: more than one request can be added
+            new_request = self.request_pool.pop_request()
+            logging.info(f"Scheduler: new request={new_request.req_id}")
+            self.context.add_active_request(new_request)
+
+    def roundrobin_policy(self) -> None:
+        while len(self.request_pool.queued_requests) > 0:
+            new_request = self.request_pool.pop_request()
+            logging.info(f"Scheduler: new request={new_request.req_id}")
+            if len(self.context.requests) < self.max_concurrent_requests:
+                self.context.add_active_request(new_request)
+            else:
+                self.context.add_inactive_request(new_request)
+            self.context.req_runtime_stats[new_request.req_id].roundrobin_counter = 0
+
+        new_requests = []
+        new_pending = []
+        for req in self.context.requests:
+            kept = True
+            if self.context.req_runtime_stats[req.req_id].roundrobin_counter >= 10:
+                if len(self.context.pending_requests) > 1:
+                    self.context.req_runtime_stats[req.req_id].roundrobin_counter = 0
+                    new_pending.append(req)
+                    new_request.append(self.context.pending_requests.pop(0))
+                    kept = False
+            if kept:
+                new_requests.append(req)
+        self.context.requests = new_requests
+        self.context.pending_requests.extend(new_pending)
+
+        for req in self.context.requests:
+            self.context.req_runtime_stats[req.req_id].roundrobin_counter += 1
 
     def remove_finished(self, logits: torch.Tensor) -> list[RequestInfo]:
         finished = []

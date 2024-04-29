@@ -216,6 +216,53 @@ def eval_python(req: str, lazy: bool):
     plugin_scheduler.join_all()
 
 
+def eval_scheduling():
+    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    logging.info(f"Loading model {model_name}")
+    plugin_scheduler = PluginScheduler()
+    engine = ScheduleEngine(
+        ModelConfig(model_name),
+        PythonParser,
+        plugin_scheduler,
+        max_concurrent_requests=1,
+    )
+    logging.info(f"Model {model_name} loaded")
+    # req_id = engine.request_pool.add_request("Plotting a sine wave in python.")
+    req_id = engine.request_pool.add_request(
+        "List 10 famous mathematicians and their contributions."
+    )
+    req_id2 = engine.request_pool.add_request(
+        "Write an email to manager about this quarter's performance in a financial company."
+    )
+    init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
+    i = 0
+    time_start = time.perf_counter()
+    while i < 500:
+        finished = engine.iteration_step()
+        if finished:
+            break
+        i += 1
+
+    if plugin_scheduler.lazy:
+        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+
+    if finished:
+        while len(plugin_scheduler.waiting_queue) > 0:
+            res = plugin_scheduler.poll_finished(
+                list(plugin_scheduler.waiting_queue.keys())[0]
+            )
+        time_end = time.perf_counter()
+        logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
+        )
+        logging.info(f"Time: {time_end - time_start} s")
+
+    else:
+        logging.info("Ongoing: " + engine.context.requests[0].decode())
+    plugin_scheduler.join_all()
+
+
 def main100():
     # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     model_name = "meetkai/functionary-small-v2.2"
@@ -306,7 +353,7 @@ def main100():
     logging.info(f"KV Cache usage: {page_used/page_all*100:.2f}%")
 
 
-if __name__ == "__main__":
+def good_python_example():
     set_hf_token()
     # eval_python("Plotting a sine wave in python. ONLY output code", lazy=False)
     # eval_python("Plotting a sine wave in python with torch. ONLY output code without trailing explanation.", lazy=False)
@@ -315,3 +362,9 @@ if __name__ == "__main__":
         "Plotting a sine wave in python with torch and matplotlib. ONLY output code without trailing explanation.",
         lazy=False,
     )
+
+
+if __name__ == "__main__":
+    # set_hf_token()
+    # eval_scheduling()
+    good_python_example()
