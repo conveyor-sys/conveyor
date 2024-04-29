@@ -231,9 +231,9 @@ def eval_scheduling():
     req_id = engine.request_pool.add_request(
         "List 10 famous mathematicians and their contributions."
     )
-    # req_id2 = engine.request_pool.add_request(
-    #     "Write an email to manager about this quarter's performance in a financial company."
-    # )
+    req_id2 = engine.request_pool.add_request(
+        "Write an email to manager about this quarter's performance in a financial company."
+    )
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     time_start = time.perf_counter()

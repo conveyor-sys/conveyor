@@ -269,8 +269,8 @@ class ScheduleEngine:
 
     @torch.inference_mode()
     def iteration_step(self, remove_finished: bool = True) -> list[RequestInfo]:
-        # self.roundrobin_policy()
-        self.fcfs_policy()
+        self.roundrobin_policy()
+        # self.fcfs_policy()
         next_operation = self.schedule_next_operation()
         # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
@@ -460,10 +460,10 @@ class ScheduleEngine:
         for req in self.context.requests:
             kept = True
             if self.context.req_runtime_stats[req.req_id].roundrobin_counter >= 10:
-                if len(self.context.pending_requests) > 1:
+                if len(self.context.pending_requests) > 0:
                     self.context.req_runtime_stats[req.req_id].roundrobin_counter = 0
                     new_pending.append(req)
-                    new_request.append(self.context.pending_requests.pop(0))
+                    new_requests.append(self.context.pending_requests.pop(0))
                     kept = False
             if kept:
                 new_requests.append(req)
