@@ -281,7 +281,7 @@ class ScheduleEngine:
             case InferenceState.AWAIT:
                 logging.error("Scheduler: no-op in AWAIT state")
                 return
-        result = self.sample_logits(logits)
+        result = self.sample_logits(logits).to('cpu')
         self.context.update_req(result)
         self.poll_plugin()
         if remove_finished:
