@@ -1,3 +1,4 @@
+from cmath import log
 from conveyor.models.config import ModelConfig
 from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.parsing import BaseParser, FunctionaryParser, PythonParser
@@ -60,7 +61,7 @@ tools = [  # For functionary-7b-v2 we use "tools"; for functionary-7b-v1.4 we us
 
 def eval_search():
     model_name = "meetkai/functionary-small-v2.2"
-    plugin_scheduler = PluginScheduler(lazy=True)
+    plugin_scheduler = PluginScheduler(lazy=False)
     engine = ScheduleEngine(
         ModelConfig(model_name), FunctionaryParser, plugin_scheduler
     )
@@ -73,7 +74,8 @@ def eval_search():
             messages=[
                 {
                     "role": "user",
-                    "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
+                    # "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
+                    "content": "Show me how to write hello world in python, c++ and java respectively with google tool, and only use result from stackoverflow.com",
                 }
             ],
             tools=tools,
@@ -90,15 +92,24 @@ def eval_search():
         if finished:
             break
         i += 1
-
-    if plugin_scheduler.lazy:
-        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+    logging.info("Finished: 500 iteration")
 
     if finished:
-        while len(plugin_scheduler.waiting_queue) > 0:
-            res = plugin_scheduler.poll_finished(
-                list(plugin_scheduler.waiting_queue.keys())[0]
-            )
+        res = None
+        if plugin_scheduler.lazy:
+            cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
+            while (
+                cur_id in plugin_scheduler.lazy_queue
+                and len(plugin_scheduler.lazy_queue[cur_id]) > 0
+            ):
+                plugin_scheduler.flush_lazy_sequentially(cur_id)
+                while len(plugin_scheduler.waiting_queue) > 0:
+                    res = plugin_scheduler.poll_finished(cur_id)
+        else:
+            while len(plugin_scheduler.waiting_queue) > 0:
+                res = plugin_scheduler.poll_finished(
+                    list(plugin_scheduler.waiting_queue.keys())[0]
+                )
         time_end = time.perf_counter()
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")

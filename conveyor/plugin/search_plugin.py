@@ -38,9 +38,7 @@ class SearchPlugin(BasePlugin):
             start = time.perf_counter()
             result = search(self.session, self.query, "en", "us")
             end = time.perf_counter()
-            logging.info(
-                f"SearchPlugin result: {result}\n taking {end - start} seconds"
-            )
+            logging.info(f"SearchPlugin: taking {end - start} seconds")
             return result
 
 
@@ -68,7 +66,6 @@ def search(session: requests.Session, query: str, language: str, country: str) -
     )
     logging.debug(f"Status code: {html.status_code}")
     soup = BeautifulSoup(html.text, "lxml")
-    logging.debug("Engine inited")
     for result in soup.select(".tF2Cxc"):
         title = result.select_one(".DKV0Md").text
         try:
@@ -78,7 +75,6 @@ def search(session: requests.Session, query: str, language: str, country: str) -
         links = result.select_one(".yuRUbf a")["href"]
 
         data.append({"title": title, "snippet": snippet, "links": links})
-    logging.debug("Parsing done")
     if soup.select_one(".d6cvqb a[id=pnnext]"):
         params["start"] += 10
     return data

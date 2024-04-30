@@ -1,3 +1,4 @@
+from tkinter import S
 from typing import Dict, List, Optional
 
 import multiprocessing as mp
@@ -114,6 +115,18 @@ class PluginScheduler:
                     del self.waiting_queue[client_id]
                 return [res]
         return None
+
+    def flush_lazy_sequentially(self, client_id: str):
+        if self.lazy_queue.get(client_id) is None:
+            return
+        queue = self.lazy_queue[client_id]
+        queue[0].local_pipe.send(finish_str)
+        if self.waiting_queue.get(client_id) is None:
+            self.waiting_queue[client_id] = []
+        self.waiting_queue[client_id].append(queue[0])
+        queue.pop(0)
+        if len(queue) == 0:
+            del self.lazy_queue[client_id]
 
     def join_all(self):
         proc_cnt = len(self.join_queue)
