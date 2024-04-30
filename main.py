@@ -257,7 +257,7 @@ def eval_scheduling():
     else:
         time_end = time.perf_counter()
         logging.info("Ongoing: " + engine.context.requests[0].decode())
-        final_tokens_len = len(engine.context.requests[0].tokens)
+        final_tokens_len = len(engine.context.req_runtime_stats[req_id].tokens)
 
     logging.info(
         f"Speed: {(final_tokens_len-init_tokens_len)/(time_end - time_start)} tokens/s"

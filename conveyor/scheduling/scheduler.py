@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 from typing import Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
@@ -281,7 +282,7 @@ class ScheduleEngine:
             case InferenceState.AWAIT:
                 logging.error("Scheduler: no-op in AWAIT state")
                 return
-        result = self.sample_logits(logits).to('cpu')
+        result = self.sample_logits(logits).to("cpu")
         self.context.update_req(result)
         self.poll_plugin()
         if remove_finished:
@@ -472,6 +473,69 @@ class ScheduleEngine:
 
         for req in self.context.requests:
             self.context.req_runtime_stats[req.req_id].roundrobin_counter += 1
+
+    def cfs_policy(self) -> None:
+        while len(self.request_pool.queued_requests) > 0:
+            new_request = self.request_pool.pop_request()
+            logging.info(f"Scheduler: new request={new_request.req_id}")
+            if len(self.context.requests) < self.max_concurrent_requests:
+                self.context.add_active_request(new_request)
+            else:
+                self.context.add_inactive_request(new_request)
+
+    def unload_to_pending(self, logits: torch.Tensor) -> None:
+        unloaded = []
+        for i, req in enumerate(self.context.requests):
+            # <|stop|>
+            if logits[i] == 32003:
+                req.estimated_pending_ddl = datetime.now()
+                unloaded.append(req)
+        if len(unloaded) > 0:
+            self.context.pending_requests.extend(unloaded)
+            self.context.requests = [
+                req for req in self.context.requests if req not in unloaded
+            ]
+            self.context._recompute_batch_state()
+            logging.debug(
+                f"Unloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+            )
+
+    """
+    Require _recompute_batch_state() to be called after this method
+    """
+
+    def evict_worst_roundrobin(self) -> None:
+        if len(self.context.requests) < self.max_concurrent_requests:
+            return
+        worst_req_idx = 0
+        for idx, req in enumerate(self.context.requests):
+            if idx == 0:
+                continue
+            if (
+                self.context.req_runtime_stats[req.req_id].roundrobin_counter
+                > self.context.req_runtime_stats[
+                    self.context.requests[worst_req_idx].req_id
+                ].roundrobin_counter
+            ):
+                worst_req_idx = idx
+        evicted_req = self.context.requests.pop(worst_req_idx)
+        evicted_req.roundrobin_counter = 0
+        self.context.pending_requests.append(evicted_req)
+
+    def reload_from_pending(self, req_id: str, self_evict) -> None:
+        self_evict(self)
+        for req in self.context.pending_requests:
+            if req.req_id == req_id:
+                self.context.requests.append(req)
+                self.context.pending_requests = [
+                    r for r in self.context.pending_requests if r.req_id != req_id
+                ]
+                self.context._recompute_batch_state()
+                logging.debug(
+                    f"Reloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+                )
+                return
+        logging.error(f"Request {req_id} not found in pending requests")
 
     def remove_finished(self, logits: torch.Tensor) -> list[RequestInfo]:
         finished = []
