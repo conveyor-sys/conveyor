@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Tuple
 import torch
 from conveyor.utils import getLogger
 
@@ -73,7 +73,7 @@ class CacheManager:
             page_idx.size(0) if isinstance(page_idx, torch.Tensor) else 1
         )
 
-    def page_usage(self) -> (int, int):
+    def page_usage(self) -> Tuple[int, int]:
         """
         return: (used, all)
         """

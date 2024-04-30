@@ -8,6 +8,21 @@ logging = getLogger(__name__)
 
 class BaseParser:
     def enqueue(self, token) -> Optional[Dict | List]:
+        raise NotImplementedError
+
+
+class PlaceHolderParser(BaseParser):
+    def __init__(self, tokenizer, client_id, start_cb, update_cb, finish_cb):
+        self.buffer = []
+        self.in_progress = False
+        self.string = ""
+        self.tokenizer = tokenizer
+        self.start_cb = start_cb
+        self.update_cb = update_cb
+        self.finish_cb = finish_cb
+        self.client_id = client_id
+
+    def enqueue(self, token) -> Optional[Dict | List]:
         pass
 
 

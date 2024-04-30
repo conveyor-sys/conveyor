@@ -142,7 +142,7 @@ class RequestInfo:
         self.tokenizer = tokenizer
         self.tokens: List = tokenizer.encode(input_text)
         # self.state = state
-        self.estimated_pending_ddl: Optional[datetime.datetime] = None
+        self.invocation_timestamp: Optional[datetime.datetime] = None
 
         self.parser = parser
 
@@ -156,7 +156,7 @@ class RequestInfo:
         return self.tokenizer.decode(self.tokens)
 
     def ready(self) -> bool:
-        return self.estimated_pending_ddl is None
+        return self.invocation_timestamp is None
 
     def extend_str_no_re_encoding(self, content: str) -> int:
         self.input_text += content

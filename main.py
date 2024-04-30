@@ -1,7 +1,12 @@
 from cmath import log
 from conveyor.models.config import ModelConfig
 from conveyor.plugin.scheduler import PluginScheduler
-from conveyor.scheduling.parsing import BaseParser, FunctionaryParser, PythonParser
+from conveyor.scheduling.parsing import (
+    BaseParser,
+    FunctionaryParser,
+    PlaceHolderParser,
+    PythonParser,
+)
 from conveyor.scheduling.scheduler import ScheduleEngine
 import time
 from misc.functionary import generate_functionary_input
@@ -159,12 +164,14 @@ def eval_python(req: str, lazy: bool):
 
 
 def eval_scheduling():
+    # model_name = "meetkai/functionary-small-v2.2"
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
     plugin_scheduler = PluginScheduler()
     engine = ScheduleEngine(
         ModelConfig(model_name),
-        PythonParser,
+        PlaceHolderParser,
+        # FunctionaryParser,
         plugin_scheduler,
         max_concurrent_requests=1,
     )
@@ -172,9 +179,29 @@ def eval_scheduling():
     # req_id = engine.request_pool.add_request("Plotting a sine wave in python.")
     req_id = engine.request_pool.add_request(
         "List 10 famous mathematicians and their contributions."
+        # generate_functionary_input(
+        #     messages=[
+        #         {
+        #             "role": "user",
+        #             "content": "List 10 famous mathematicians and their contributions.",
+        #         }
+        #     ],
+        #     tools=tools,
+        # )
+        # + "\n<|from|> assistant\n<|recipient|>"
     )
     req_id2 = engine.request_pool.add_request(
         "Write an email to manager about this quarter's performance in a financial company."
+        # generate_functionary_input(
+        #     messages=[
+        #         {
+        #             "role": "user",
+        #             "content": "Write an email to manager about this quarter's performance in a financial company without using tool.",
+        #         }
+        #     ],
+        #     tools=tools,
+        # )
+        # + "\n<|from|> assistant\n<|recipient|>all"
     )
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0

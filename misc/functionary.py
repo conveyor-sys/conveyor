@@ -470,5 +470,9 @@ def generate_functionary_input(messages=messages, tools=tools):
     return full_text.strip()
 
 
+def fill_response_template(func_name: str, text: str) -> str:
+    return f"\n<|from|>{func_name}\n<|recipient|>all\n<|content|>{text}"
+
+
 if __name__ == "__main__":
     print(generate_functionary_input(messages, tools))

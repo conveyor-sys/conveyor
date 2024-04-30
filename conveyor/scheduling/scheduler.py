@@ -249,7 +249,7 @@ class ScheduleEngine:
             logging.warning(f"Memory usage: {used}/{total}")
             evicted_page = 0
             for req in self.context.pending_requests:
-                if req.estimated_pending_ddl is not None:
+                if req.invocation_timestamp is not None:
                     # leave 10 pages at max
                     req_page = self.context.page_used_by(req.req_id)
                     if req_page > 10:
@@ -447,11 +447,13 @@ class ScheduleEngine:
             self.context.add_active_request(new_request)
 
     def roundrobin_policy(self) -> None:
+        changed = False
         while len(self.request_pool.queued_requests) > 0:
             new_request = self.request_pool.pop_request()
             logging.info(f"Scheduler: new request={new_request.req_id}")
             if len(self.context.requests) < self.max_concurrent_requests:
                 self.context.add_active_request(new_request)
+                changed = True
             else:
                 self.context.add_inactive_request(new_request)
             self.context.req_runtime_stats[new_request.req_id].roundrobin_counter = 0
@@ -466,6 +468,7 @@ class ScheduleEngine:
                     new_pending.append(req)
                     new_requests.append(self.context.pending_requests.pop(0))
                     kept = False
+                    changed = True
             if kept:
                 new_requests.append(req)
         self.context.requests = new_requests
@@ -473,6 +476,8 @@ class ScheduleEngine:
 
         for req in self.context.requests:
             self.context.req_runtime_stats[req.req_id].roundrobin_counter += 1
+        if changed:
+            self.context._recompute_batch_state()
 
     def cfs_policy(self) -> None:
         while len(self.request_pool.queued_requests) > 0:
@@ -488,7 +493,7 @@ class ScheduleEngine:
         for i, req in enumerate(self.context.requests):
             # <|stop|>
             if logits[i] == 32003:
-                req.estimated_pending_ddl = datetime.now()
+                req.invocation_timestamp = datetime.now()
                 unloaded.append(req)
         if len(unloaded) > 0:
             self.context.pending_requests.extend(unloaded)
@@ -500,13 +505,10 @@ class ScheduleEngine:
                 f"Unloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
             )
 
-    """
-    Require _recompute_batch_state() to be called after this method
-    """
-
-    def evict_worst_roundrobin(self) -> None:
+    # Require _recompute_batch_state() to be called after this method
+    def evict_worst_roundrobin(self) -> bool:
         if len(self.context.requests) < self.max_concurrent_requests:
-            return
+            return True
         worst_req_idx = 0
         for idx, req in enumerate(self.context.requests):
             if idx == 0:
@@ -521,28 +523,35 @@ class ScheduleEngine:
         evicted_req = self.context.requests.pop(worst_req_idx)
         evicted_req.roundrobin_counter = 0
         self.context.pending_requests.append(evicted_req)
+        return True
 
     def reload_from_pending(self, req_id: str, self_evict) -> None:
-        self_evict(self)
+        add_now = self_evict(self)
         for req in self.context.pending_requests:
             if req.req_id == req_id:
-                self.context.requests.append(req)
-                self.context.pending_requests = [
-                    r for r in self.context.pending_requests if r.req_id != req_id
-                ]
-                self.context._recompute_batch_state()
-                logging.debug(
-                    f"Reloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
-                )
+                req.invocation_timestamp = None
+                if add_now:
+                    self.context.requests.append(req)
+                    self.context.pending_requests = [
+                        r for r in self.context.pending_requests if r.req_id != req_id
+                    ]
+                    self.context._recompute_batch_state()
+                    logging.debug(
+                        f"Reloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
+                    )
                 return
         logging.error(f"Request {req_id} not found in pending requests")
 
-    def remove_finished(self, logits: torch.Tensor) -> list[RequestInfo]:
+    def remove_finished(
+        self, logits: torch.Tensor, skip_stop=False
+    ) -> list[RequestInfo]:
         finished = []
         # check eos in logits and remove finished requests
         for i, req in enumerate(self.context.requests):
             # </s> or <|stop|>
-            if logits[i] == self.tokenizer.eos_token_id or logits[i] == 32003:
+            if logits[i] == self.tokenizer.eos_token_id or (
+                not skip_stop and logits[i] == 32003
+            ):
                 finished.append(req)
                 self.context.req_runtime_stats.pop(req.req_id)
 
