@@ -68,25 +68,27 @@ def eval_search():
     model_name = "meetkai/functionary-small-v2.2"
     plugin_scheduler = PluginScheduler(lazy=False)
     engine = ScheduleEngine(
-        ModelConfig(model_name), FunctionaryParser, plugin_scheduler
+        ModelConfig(model_name),
+        FunctionaryParser,
+        plugin_scheduler,
+        sequential_call=True,
     )
     logging.info(f"Model {model_name} loaded")
     req_id = engine.request_pool.add_request(
-        # "Describe the basic components of a neural network and how it can be trained"
-        # "[INST]Describe the basic components of a neural network and how it can be trained. [/INST]"
-        # "\nAnd tell me how to write the Greatest common divisor algorithm in Python? Show me the code."
         generate_functionary_input(
             messages=[
                 {
                     "role": "user",
                     # "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
-                    "content": "Show me how to write hello world in python, c++ and java respectively with google tool, and only use result from stackoverflow.com",
+                    # "content": "Show me how to write hello world in python, c++ and java respectively with google tool, and only use result from stackoverflow.com",
+                    "content": "Show me how to write hello world in python and c++ respectively with google tool, and only use result from stackoverflow.com",
                 }
             ],
             tools=tools,
         )
         + "\n<|from|> assistant\n<|recipient|>"
     )
+    # let parser aware of <|recipient|> token
     engine.request_pool.queued_requests[0].parser.buffer.append(32001)
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
@@ -101,20 +103,33 @@ def eval_search():
 
     if finished:
         res = None
-        if plugin_scheduler.lazy:
-            cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
-            while (
-                cur_id in plugin_scheduler.lazy_queue
-                and len(plugin_scheduler.lazy_queue[cur_id]) > 0
-            ):
-                plugin_scheduler.flush_lazy_sequentially(cur_id)
-                while len(plugin_scheduler.waiting_queue) > 0:
-                    res = plugin_scheduler.poll_finished(cur_id)
-        else:
+        # if plugin_scheduler.lazy:
+        #     cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
+        #     while (
+        #         cur_id in plugin_scheduler.lazy_queue
+        #         and len(plugin_scheduler.lazy_queue[cur_id]) > 0
+        #     ):
+        #         plugin_scheduler.flush_lazy_sequentially(cur_id)
+        #         while len(plugin_scheduler.waiting_queue) > 0:
+        #             res = plugin_scheduler.poll_finished(cur_id)
+        # else:
+        #     while len(plugin_scheduler.waiting_queue) > 0:
+        #         res = plugin_scheduler.poll_finished(
+        #             list(plugin_scheduler.waiting_queue.keys())[0]
+        #         )
+        if not plugin_scheduler.lazy:
             while len(plugin_scheduler.waiting_queue) > 0:
                 res = plugin_scheduler.poll_finished(
                     list(plugin_scheduler.waiting_queue.keys())[0]
                 )
+        cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
+        while (
+            cur_id in plugin_scheduler.lazy_queue
+            and len(plugin_scheduler.lazy_queue[cur_id]) > 0
+        ):
+            plugin_scheduler.flush_lazy_sequentially(cur_id)
+            while len(plugin_scheduler.waiting_queue) > 0:
+                res = plugin_scheduler.poll_finished(cur_id)
         time_end = time.perf_counter()
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
@@ -164,45 +179,46 @@ def eval_python(req: str, lazy: bool):
 
 
 def eval_scheduling():
-    # model_name = "meetkai/functionary-small-v2.2"
-    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    model_name = "meetkai/functionary-small-v2.2"
     logging.info(f"Loading model {model_name}")
     plugin_scheduler = PluginScheduler()
     engine = ScheduleEngine(
         ModelConfig(model_name),
-        PlaceHolderParser,
-        # FunctionaryParser,
+        # PlaceHolderParser,
+        FunctionaryParser,
         plugin_scheduler,
         max_concurrent_requests=1,
     )
     logging.info(f"Model {model_name} loaded")
-    # req_id = engine.request_pool.add_request("Plotting a sine wave in python.")
     req_id = engine.request_pool.add_request(
-        "List 10 famous mathematicians and their contributions."
-        # generate_functionary_input(
-        #     messages=[
-        #         {
-        #             "role": "user",
-        #             "content": "List 10 famous mathematicians and their contributions.",
-        #         }
-        #     ],
-        #     tools=tools,
-        # )
-        # + "\n<|from|> assistant\n<|recipient|>"
+        # "List 10 famous mathematicians and their contributions."
+        generate_functionary_input(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Show me how to write hello world in python with google search tool ",
+                }
+            ],
+            tools=tools,
+        )
+        + "\n<|from|> assistant\n<|recipient|>"
     )
     req_id2 = engine.request_pool.add_request(
-        "Write an email to manager about this quarter's performance in a financial company."
-        # generate_functionary_input(
-        #     messages=[
-        #         {
-        #             "role": "user",
-        #             "content": "Write an email to manager about this quarter's performance in a financial company without using tool.",
-        #         }
-        #     ],
-        #     tools=tools,
-        # )
-        # + "\n<|from|> assistant\n<|recipient|>all"
+        # "Write an email to manager about this quarter's performance in a financial company."
+        generate_functionary_input(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Write an email to manager about this quarter's performance in a financial company without using tool.",
+                }
+            ],
+            tools=tools,
+        )
+        + "\n<|from|> assistant\n<|recipient|>all\n"
     )
+    engine.request_pool.queued_requests[0].parser.buffer.append(32001)
+    engine.request_pool.queued_requests[1].parser.buffer.append(32001)
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     time_start = time.perf_counter()
@@ -221,13 +237,14 @@ def eval_scheduling():
                 list(plugin_scheduler.waiting_queue.keys())[0]
             )
         time_end = time.perf_counter()
-        logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(f"Finished count={len(finished)} iter={i}: {finished[0].decode()}")
         final_tokens_len = len(finished[0].tokens)
     else:
         time_end = time.perf_counter()
         logging.info("Ongoing: " + engine.context.requests[0].decode())
         final_tokens_len = len(engine.context.requests[0].tokens)
 
+    logging.info(f"Req1: {engine.context.pending_requests[0].decode()}")
     logging.info(
         f"Speed: {(final_tokens_len-init_tokens_len)/(time_end - time_start)} tokens/s"
     )
@@ -248,4 +265,5 @@ def good_python_example():
 
 if __name__ == "__main__":
     set_hf_token()
-    eval_scheduling()
+    # eval_scheduling()
+    eval_search()

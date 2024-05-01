@@ -52,7 +52,7 @@ class PluginScheduler:
 
     def start_plugin(self, client_id: str, plugin_name: str):
         assert self.plugin_map.get(client_id) is None
-        match plugin_name:
+        match plugin_name.strip():
             case "python":
                 plugin = PythonPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting python plugin")
@@ -62,18 +62,21 @@ class PluginScheduler:
             case _:
                 plugin = PlaceholderPlugin()
                 logging.warn(
-                    f"[PluginScheduler:{client_id}] Starting placeholder plugin"
+                    f"[PluginScheduler:{client_id}] Starting placeholder plugin for {plugin_name}"
                 )
         self.plugin_map[client_id] = PluginInstance(plugin)
         pass
 
     def process_new_data(self, client_id: str, data: str):
         plugin = self.plugin_map.get(client_id)
+        if plugin is None:
+            print(f"Plugin not found: {client_id}, data={data}", file=sys.stderr)
         assert plugin is not None
         plugin.local_pipe.send(data)
 
-    def finish_plugin(self, client_id: str, force: bool = False):
-        if self.lazy and not force:
+    def finish_plugin(self, client_id: str, sequential: bool = False):
+        if self.lazy or (sequential and self.waiting_queue.get(client_id) is not None):
+            # logging.warn(f"[PluginScheduler] sequential={sequential}")
             plugin = self.plugin_map.get(client_id)
             assert plugin is not None
             if self.lazy_queue.get(client_id) is None:

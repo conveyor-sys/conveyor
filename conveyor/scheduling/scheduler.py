@@ -173,6 +173,7 @@ class ScheduleEngine:
         parser_cls,
         plugin_scheduler: PluginScheduler,
         max_concurrent_requests: int = 16,
+        sequential_call: bool = False,
     ):
         nccl_port = 5000
         tp_size = 1
@@ -227,7 +228,7 @@ class ScheduleEngine:
                 id,
                 lambda id, plugin_name: plugin_scheduler.start_plugin(id, plugin_name),
                 lambda id, dat: plugin_scheduler.process_new_data(id, dat),
-                lambda id: plugin_scheduler.finish_plugin(id),
+                lambda id: plugin_scheduler.finish_plugin(id, sequential_call),
             ),
         )
         self.max_concurrent_requests = max_concurrent_requests
