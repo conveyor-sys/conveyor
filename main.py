@@ -11,8 +11,9 @@ from misc.functionary import generate_functionary_input
 from _private.access_token import set_hf_token
 
 
-from conveyor.utils import getLogger
+from conveyor.utils import clear_other_logger, getLogger
 
+clear_other_logger()
 logging = getLogger("conveyor.main")
 
 
@@ -120,14 +121,15 @@ def eval_search(lazy: bool) -> float:
                 res = plugin_scheduler.poll_finished(
                     list(plugin_scheduler.waiting_queue.keys())[0]
                 )
-        cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
-        while (
-            cur_id in plugin_scheduler.lazy_queue
-            and len(plugin_scheduler.lazy_queue[cur_id]) > 0
-        ):
-            plugin_scheduler.flush_lazy_sequentially(cur_id)
-            while len(plugin_scheduler.waiting_queue) > 0:
-                res = plugin_scheduler.poll_finished(cur_id)
+        if len(plugin_scheduler.lazy_queue) > 0:
+            cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
+            while (
+                cur_id in plugin_scheduler.lazy_queue
+                and len(plugin_scheduler.lazy_queue[cur_id]) > 0
+            ):
+                plugin_scheduler.flush_lazy_sequentially(cur_id)
+                while len(plugin_scheduler.waiting_queue) > 0:
+                    res = plugin_scheduler.poll_finished(cur_id)
         time_end = time.perf_counter()
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
@@ -255,14 +257,13 @@ def eval_scheduling():
     plugin_scheduler.join_all()
 
 
-def eval_python_wrapper(lazy: bool):
-    set_hf_token()
+def eval_python_wrapper(lazy: bool) -> float:
     # eval_python("Plotting a sine wave in python. ONLY output code", lazy=False)
     # eval_python("Plotting a sine wave in python with torch. ONLY output code without trailing explanation.", lazy=False)
     # eval_python("Plotting a cosine wave in python with torch and matplotlib. ONLY output code without trailing explanation.", lazy=True)
-    eval_python(
+    return eval_python(
         "Plotting a sine wave in python with torch and matplotlib. ONLY output code without trailing explanation.",
-        lazy=False,
+        lazy=lazy,
     )
 
 
@@ -283,3 +284,7 @@ if __name__ == "__main__":
         case "scheduling":
             eval_scheduling()
             result = -1
+        case _:
+            print("Usage: python main.py [python|scheduling|search] [lazy?]")
+            sys.exit(1)
+    print(f"Result: {result}", file=sys.stderr)

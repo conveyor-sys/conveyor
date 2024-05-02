@@ -24,3 +24,8 @@ def getLogger(name: str) -> logging.Logger:
     logger.propagate = False
 
     return logger
+
+
+def clear_other_logger():
+    logging.getLogger("vllm").handlers.clear()
+    logging.getLogger("vllm.model_executor.weight_utils").handlers.clear()
