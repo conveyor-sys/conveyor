@@ -1,14 +1,12 @@
-from cmath import log
 from conveyor.models.config import ModelConfig
 from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.parsing import (
-    BaseParser,
     FunctionaryParser,
-    PlaceHolderParser,
     PythonParser,
 )
 from conveyor.scheduling.scheduler import ScheduleEngine
 import time
+import sys
 from misc.functionary import generate_functionary_input
 from _private.access_token import set_hf_token
 
@@ -64,9 +62,9 @@ tools = [  # For functionary-7b-v2 we use "tools"; for functionary-7b-v1.4 we us
 ]
 
 
-def eval_search():
+def eval_search(lazy: bool) -> float:
     model_name = "meetkai/functionary-small-v2.2"
-    plugin_scheduler = PluginScheduler(lazy=False)
+    plugin_scheduler = PluginScheduler(lazy=lazy)
     engine = ScheduleEngine(
         ModelConfig(model_name),
         FunctionaryParser,
@@ -137,12 +135,15 @@ def eval_search():
             f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
         )
         logging.info(f"Time: {time_end-time_start} s")
+        ret_val = time_end - time_start
     else:
         logging.info("Ongoing: " + engine.context.requests[0].decode())
+        ret_val = -1
     plugin_scheduler.join_all()
+    return ret_val
 
 
-def eval_python(req: str, lazy: bool):
+def eval_python(req: str, lazy: bool) -> float:
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     logging.info(f"Loading model {model_name}")
     plugin_scheduler = PluginScheduler(lazy)
@@ -172,10 +173,12 @@ def eval_python(req: str, lazy: bool):
             f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
         )
         logging.info(f"Time: {time_end - time_start} s")
-
+        ret_val = time_end - time_start
     else:
         logging.info("Ongoing: " + engine.context.requests[0].decode())
+        ret_val = -1
     plugin_scheduler.join_all()
+    return ret_val
 
 
 def eval_scheduling():
@@ -252,7 +255,7 @@ def eval_scheduling():
     plugin_scheduler.join_all()
 
 
-def good_python_example():
+def eval_python_wrapper(lazy: bool):
     set_hf_token()
     # eval_python("Plotting a sine wave in python. ONLY output code", lazy=False)
     # eval_python("Plotting a sine wave in python with torch. ONLY output code without trailing explanation.", lazy=False)
@@ -264,6 +267,19 @@ def good_python_example():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) <= 1:
+        print("Usage: python main.py [python|scheduling|search] [lazy?]")
+        sys.exit(1)
+    if len(sys.argv) == 3 and sys.argv[2] == "lazy":
+        lazy = True
+    else:
+        lazy = False
     set_hf_token()
-    # eval_scheduling()
-    eval_search()
+    match sys.argv[1]:
+        case "python":
+            result = eval_python_wrapper(lazy)
+        case "search":
+            result = eval_search(lazy)
+        case "scheduling":
+            eval_scheduling()
+            result = -1
