@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Tuple
+import time
+from typing import Optional, Tuple
 from attr import dataclass
 from conveyor.models.config import ModelConfig
 from conveyor.models.utils import load_model, load_tokenizer
@@ -270,9 +271,14 @@ class ScheduleEngine:
         return self.context.extend_req_with_str(req_id, new_content)
 
     @torch.inference_mode()
-    def iteration_step(self, remove_finished: bool = True) -> list[RequestInfo]:
-        self.roundrobin_policy()
-        # self.fcfs_policy()
+    def iteration_step(
+        self,
+        remove_finished: bool = True,
+        unload_stop: bool = False,
+        manually_poll: bool = False,
+    ) -> list[RequestInfo]:
+        # self.roundrobin_policy()
+        self.fcfs_policy()
         next_operation = self.schedule_next_operation()
         # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
@@ -281,23 +287,32 @@ class ScheduleEngine:
             case InferenceState.DECODE:
                 logits, _ = self.forward_decode(self.context)
             case InferenceState.AWAIT:
-                logging.error("Scheduler: no-op in AWAIT state")
+                if not manually_poll:
+                    self.poll_plugin()
+                time.sleep(0.02)
                 return
         result = self.sample_logits(logits).to("cpu")
         self.context.update_req(result)
-        self.poll_plugin()
+        if not manually_poll:
+            self.poll_plugin()
         if remove_finished:
-            finished = self.remove_finished(result)
+            finished = self.remove_finished(result, unload_stop)
             return finished
         else:
-            return []
+            if unload_stop:
+                return self.unload_to_pending(result)
+            else:
+                return []
 
-    def poll_plugin(self) -> None:
+    def poll_plugin(self) -> list[Tuple[str, Tuple[str]]]:
         keys = list(self.plugin_scheduler.waiting_queue.keys())
+        result = []
         for k in keys:
             res = self.plugin_scheduler.poll_finished(k)
             if res is not None:
                 logging.debug(f"Plugin {k} finished: {res[0]}")
+                result.append((k, res))
+        return result
 
     def prepare_kv_page(
         req_ids: torch.Tensor, sched_ctx: SchedulerContext, cache_manager: CacheManager
@@ -427,18 +442,29 @@ class ScheduleEngine:
             return InferenceState.APPEND
         else:
             changed = False
-            while (
-                len(self.context.pending_requests) > 0
-                and len(self.context.requests) < self.max_concurrent_requests
-            ):
-                self.context.requests.append(self.context.pending_requests.pop(0))
-                changed = True
+            pending_removal = []
+            for pending_req in self.context.pending_requests:
+                if len(self.context.requests) >= self.max_concurrent_requests:
+                    break
+                elif pending_req.invocation_timestamp is None:
+                    self.context.requests.append(pending_req)
+                    pending_removal.append(pending_req.req_id)
+                    changed = True
+
             if changed:
+                self.context.pending_requests = [
+                    x
+                    for x in self.context.pending_requests
+                    if x.req_id not in pending_removal
+                ]
                 logging.debug(
                     f"Next Decode: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
                 )
                 self.context._recompute_batch_state()
-            return InferenceState.DECODE
+            if len(self.context.requests) > 0:
+                return InferenceState.DECODE
+            else:
+                return InferenceState.AWAIT
 
     def fcfs_policy(self) -> None:
         while self.new_request_available():
@@ -489,13 +515,14 @@ class ScheduleEngine:
             else:
                 self.context.add_inactive_request(new_request)
 
-    def unload_to_pending(self, logits: torch.Tensor) -> None:
+    def unload_to_pending(self, logits: torch.Tensor) -> Optional[list[RequestInfo]]:
         unloaded = []
         for i, req in enumerate(self.context.requests):
             # <|stop|>
             if logits[i] == 32003:
-                req.invocation_timestamp = datetime.now()
-                unloaded.append(req)
+                if req.req_id in self.plugin_scheduler.waiting_queue:
+                    req.invocation_timestamp = datetime.now()
+                    unloaded.append(req)
         if len(unloaded) > 0:
             self.context.pending_requests.extend(unloaded)
             self.context.requests = [
@@ -505,6 +532,7 @@ class ScheduleEngine:
             logging.debug(
                 f"Unloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"
             )
+        return unloaded
 
     # Require _recompute_batch_state() to be called after this method
     def evict_worst_roundrobin(self) -> bool:
@@ -527,7 +555,7 @@ class ScheduleEngine:
         return True
 
     def reload_from_pending(self, req_id: str, self_evict) -> None:
-        add_now = self_evict(self)
+        add_now = self_evict()
         for req in self.context.pending_requests:
             if req.req_id == req_id:
                 req.invocation_timestamp = None
