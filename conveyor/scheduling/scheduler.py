@@ -277,8 +277,8 @@ class ScheduleEngine:
         unload_stop: bool = False,
         manually_poll: bool = False,
     ) -> list[RequestInfo]:
-        # self.roundrobin_policy()
-        self.fcfs_policy()
+        self.roundrobin_policy()
+        # self.fcfs_policy()
         next_operation = self.schedule_next_operation()
         # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
@@ -296,7 +296,7 @@ class ScheduleEngine:
         if not manually_poll:
             self.poll_plugin()
         if remove_finished:
-            finished = self.remove_finished(result, unload_stop)
+            finished = self.remove_finished(result, skip_stop=unload_stop)
             return finished
         else:
             if unload_stop:

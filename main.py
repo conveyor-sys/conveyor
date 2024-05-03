@@ -209,36 +209,43 @@ def eval_scheduling():
         )
         + "\n<|from|> assistant\n<|recipient|>"
     )
-    # req_id2 = engine.request_pool.add_request(
-    #     # "Write an email to manager about this quarter's performance in a financial company."
-    #     generate_functionary_input(
-    #         messages=[
-    #             {
-    #                 "role": "user",
-    #                 "content": "Write an email to manager about this quarter's performance in a financial company without using tool.",
-    #             }
-    #         ],
-    #         tools=tools,
-    #     )
-    #     + "\n<|from|> assistant\n<|recipient|>all\n"
-    # )
+    req_id2 = engine.request_pool.add_request(
+        # "Write an email to manager about this quarter's performance in a financial company."
+        generate_functionary_input(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Write an email to manager about this quarter's performance in a financial company without using tool.",
+                }
+            ],
+            tools=tools,
+        )
+        + "\n<|from|> assistant\n<|recipient|>all\n"
+    )
     engine.request_pool.queued_requests[0].parser.buffer.append(32001)
     # engine.request_pool.queued_requests[1].parser.buffer.append(32001)
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     time_start = time.perf_counter()
-    while i < 500:
+    first_stop = False
+    while i < 1000:
         unloaded = engine.iteration_step(
-            remove_finished=False, unload_stop=True, manually_poll=True
+            remove_finished=first_stop, unload_stop=not first_stop, manually_poll=True
         )
         if unloaded:
-            logging.debug(f"Unloaded: {unloaded[0].req_id}")
+            if not first_stop:
+                logging.debug(f"Unloaded: {unloaded[0].req_id}")
+                first_stop = True
+            else:
+                break
         if len(plugin_scheduler.waiting_queue) > 0:
             # process I/O reqs manually
             got = engine.poll_plugin()
             for req_id, res in got:
                 engine.reload_from_pending(req_id, engine.evict_worst_roundrobin)
-                logging.warning(f"Reload {req_id}")
+                logging.info(f"Reload {req_id}")
+                # manually hack [[{},{},...]]
+                res = res[0][:3]
                 engine.context.extend_req_with_str(
                     req_id,
                     f"\n<|from|>search\n<|recipient|>all\n<|content|>{str(res)}\n<|from|>assistant\n<|recipient|>all\n<|content|>",
@@ -261,7 +268,7 @@ def eval_scheduling():
         logging.info("Ongoing: " + engine.context.requests[0].decode())
         final_tokens_len = len(engine.context.requests[0].tokens)
 
-    # logging.info(f"Req1: {engine.context.pending_requests[0].decode()}")
+    logging.info(f"Req1: {engine.context.pending_requests[0].decode()}")
     logging.info(
         f"Speed: {(final_tokens_len-init_tokens_len)/(time_end - time_start)} tokens/s"
     )
