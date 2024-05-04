@@ -274,6 +274,7 @@ def eval_scheduling():
     )
     logging.info(f"Time: {time_end - time_start} s")
     plugin_scheduler.join_all()
+    return time_end - time_start
 
 
 def eval_python_wrapper(lazy: bool) -> float:
@@ -301,8 +302,7 @@ if __name__ == "__main__":
         case "search":
             result = eval_search(lazy)
         case "scheduling":
-            eval_scheduling()
-            result = -1
+            result = eval_scheduling()
         case _:
             print("Usage: python main.py [python|scheduling|search] [lazy?]")
             sys.exit(1)

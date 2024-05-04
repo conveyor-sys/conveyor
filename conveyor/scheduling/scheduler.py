@@ -564,6 +564,8 @@ class ScheduleEngine:
                     self.context.pending_requests = [
                         r for r in self.context.pending_requests if r.req_id != req_id
                     ]
+                    if req.roundrobin_counter is not None:
+                        req.roundrobin_counter = -10
                     self.context._recompute_batch_state()
                     logging.debug(
                         f"Reloaded: requests={[r.req_id for r in self.context.requests]}, pending={[r.req_id for r in self.context.pending_requests]}"

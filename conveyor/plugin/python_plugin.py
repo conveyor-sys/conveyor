@@ -42,7 +42,8 @@ class PythonPlugin(BasePlugin):
                 if count_prefix_spaces(data) <= count_prefix_spaces(
                     self.text_buffer[0]
                 ):
-                    exec("\n".join(self.text_buffer), self.global_vars)
+                    code = "\n".join(self.text_buffer)
+                    exec(code, self.global_vars)
                     self.text_buffer = []
             self.text_buffer.append(data)
             return None
@@ -50,7 +51,6 @@ class PythonPlugin(BasePlugin):
             return e
 
     def finish(self):
-        logging.warning(f"PythonPlugin: Finishing lazy={self.lazy}")
         if len(self.text_buffer) > 0:
             start_time = time.perf_counter()
             try:
