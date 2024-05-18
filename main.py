@@ -282,15 +282,19 @@ def eval_validation(lazy: bool) -> float:
     init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
     i = 0
     finished = None
+    res = None
     time_start = time.perf_counter()
     while i < 500:
-        finished = engine.iteration_step()
+        finished = engine.iteration_step(manually_poll=True)
+        res = engine.poll_plugin()
+        if len(res) > 0:
+            res = res[0][1]
+            break
         if finished:
             break
         i += 1
 
     if finished:
-        res = None
         if not plugin_scheduler.lazy:
             while len(plugin_scheduler.waiting_queue) > 0:
                 res = plugin_scheduler.poll_finished(
@@ -317,7 +321,7 @@ def eval_validation(lazy: bool) -> float:
         logging.info("Ongoing: " + engine.context.requests[0].decode())
         ret_val = -1
     plugin_scheduler.join_all()
-    return res
+    return res[0]
 
 
 def eval_sqlite(lazy: bool) -> float:
