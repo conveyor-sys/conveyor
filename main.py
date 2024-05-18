@@ -229,6 +229,97 @@ $4 = format_ratio($3)
     return ret_val
 
 
+def eval_validation(lazy: bool) -> float:
+    model_name = "meetkai/functionary-small-v2.2"
+    plugin_scheduler = PluginScheduler(lazy=lazy)
+    engine = ScheduleEngine(
+        ModelConfig(model_name),
+        FunctionaryParser,
+        plugin_scheduler,
+        sequential_call=True,
+    )
+    logging.info(f"Model {model_name} loaded")
+    req_id = engine.request_pool.add_request(
+        generate_functionary_input(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Show me the local news of New York on April 1st, 2024 full day.",
+                }
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "query_local_news",
+                        "description": "Get information of the local news in the designated city and time",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "time": {
+                                    "type": "string",
+                                    "description": "Time of the news, e.g. 2021-10-01",
+                                },
+                                "duration": {
+                                    "type": "string",
+                                    "description": "Duration of the news, e.g. 1 hour",
+                                },
+                            },
+                            "required": ["location"],
+                        },
+                    },
+                }
+            ],
+        )
+        + "\n<|from|> assistant\n<|recipient|>"
+    )
+    # let parser aware of <|recipient|> token
+    engine.request_pool.queued_requests[0].parser.buffer.append(32001)
+    init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
+    i = 0
+    finished = None
+    time_start = time.perf_counter()
+    while i < 500:
+        finished = engine.iteration_step()
+        if finished:
+            break
+        i += 1
+
+    if finished:
+        res = None
+        if not plugin_scheduler.lazy:
+            while len(plugin_scheduler.waiting_queue) > 0:
+                res = plugin_scheduler.poll_finished(
+                    list(plugin_scheduler.waiting_queue.keys())[0]
+                )
+        if len(plugin_scheduler.lazy_queue) > 0:
+            cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
+            while (
+                cur_id in plugin_scheduler.lazy_queue
+                and len(plugin_scheduler.lazy_queue[cur_id]) > 0
+            ):
+                plugin_scheduler.flush_lazy_sequentially(cur_id)
+                while len(plugin_scheduler.waiting_queue) > 0:
+                    res = plugin_scheduler.poll_finished(cur_id)
+        time_end = time.perf_counter()
+        logging.info(f"Plugin result: {res}")
+        logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+        )
+        logging.info(f"Time: {time_end-time_start} s")
+        ret_val = time_end - time_start
+    else:
+        logging.info("Ongoing: " + engine.context.requests[0].decode())
+        ret_val = -1
+    plugin_scheduler.join_all()
+    return res
+
+
 def eval_scheduling():
     # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     model_name = "meetkai/functionary-small-v2.2"
@@ -351,6 +442,8 @@ if __name__ == "__main__":
             result = eval_scheduling()
         case "planning":
             result = eval_planning(lazy)
+        case "validation":
+            result = eval_validation(lazy)
         case _:
             print("Usage: python main.py [python|scheduling|search] [lazy?]")
             sys.exit(1)

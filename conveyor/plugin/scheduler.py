@@ -7,6 +7,7 @@ import time
 from multiprocessing.connection import Connection
 
 from conveyor.plugin.base_plugin import BasePlugin, PlaceholderPlugin
+from conveyor.plugin.news_plugin import LocalNewsPlugin
 from conveyor.plugin.planning_plugin import PlanningPlugin
 from conveyor.plugin.python_plugin import PythonPlugin
 from conveyor.plugin.search_plugin import SearchPlugin
@@ -62,6 +63,12 @@ class PluginScheduler:
             case "planning":
                 plugin = PlanningPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting planning plugin")
+            case "query_local_news":
+                plugin = LocalNewsPlugin(self.lazy)
+                logging.debug(
+                    f"[PluginScheduler:{client_id}] Starting local news plugin"
+                )
+
             case _:
                 plugin = PlaceholderPlugin()
                 logging.warn(
