@@ -2,6 +2,7 @@ from conveyor.models.config import ModelConfig
 from conveyor.plugin.scheduler import PluginScheduler
 from conveyor.scheduling.parsing import (
     FunctionaryParser,
+    PlanningParser,
     PythonParser,
 )
 from conveyor.scheduling.scheduler import ScheduleEngine
@@ -183,6 +184,51 @@ def eval_python(req: str, lazy: bool) -> float:
     return ret_val
 
 
+def eval_planning(lazy: bool) -> float:
+    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    logging.info(f"Loading model {model_name}")
+    plugin_scheduler = PluginScheduler(lazy)
+    engine = ScheduleEngine(ModelConfig(model_name), PlanningParser, plugin_scheduler)
+    logging.info(f"Model {model_name} loaded")
+    req_id = engine.request_pool.add_request("""Please repeat the following text wrapped by >>> and <<< only once and stop immediately:
+>>>
+$1 = search(Microsoft Market Cap)
+$2 = search(Apple Market Cap)
+$3 = compute_ratio($1, $2)
+$4 = format_ratio($3)
+<<<
+""")
+    init_tokens_len = len(engine.request_pool.queued_requests[0].tokens)
+    i = 0
+    time_start = time.perf_counter()
+    while i < 500:
+        finished = engine.iteration_step()
+        if finished:
+            break
+        i += 1
+
+    if plugin_scheduler.lazy:
+        plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
+
+    if finished:
+        while len(plugin_scheduler.waiting_queue) > 0:
+            res = plugin_scheduler.poll_finished(
+                list(plugin_scheduler.waiting_queue.keys())[0]
+            )
+        time_end = time.perf_counter()
+        logging.info(f"Finished: {finished[0].decode()}")
+        logging.info(
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
+        )
+        logging.info(f"Time: {time_end - time_start} s")
+        ret_val = time_end - time_start
+    else:
+        logging.info("Ongoing: " + engine.context.requests[0].decode())
+        ret_val = -1
+    plugin_scheduler.join_all()
+    return ret_val
+
+
 def eval_scheduling():
     # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     model_name = "meetkai/functionary-small-v2.2"
@@ -303,6 +349,8 @@ if __name__ == "__main__":
             result = eval_search(lazy)
         case "scheduling":
             result = eval_scheduling()
+        case "planning":
+            result = eval_planning(lazy)
         case _:
             print("Usage: python main.py [python|scheduling|search] [lazy?]")
             sys.exit(1)

@@ -69,6 +69,48 @@ class PythonParser(BaseParser):
                 return None
 
 
+class PlanningParser(BaseParser):
+    CRLF = 13
+
+    def __init__(self, tokenizer, client_id, start_cb, update_cb, finish_cb):
+        self.buffer = []
+        self.in_progress = False
+        self.string = ""
+        self.tokenizer = tokenizer
+        self.start_cb = start_cb
+        self.update_cb = update_cb
+        self.finish_cb = finish_cb
+        self.client_id = client_id
+
+    def enqueue(self, token) -> Optional[Dict | List]:
+        self.buffer.append(token)
+        match token:
+            # CRLF, </s> or <|STOP|>
+            case self.CRLF | self.tokenizer.eos_token_id | 32003:
+                buf = None
+                if self.string == ">>>":
+                    self.start_cb(self.client_id, "planning")
+                    self.in_progress = True
+                if self.in_progress:
+                    self.update_cb(self.client_id, self.string)
+                    buf = self.buffer[:-1]
+                if self.string == "<<<" or self.string.startswith("<<<</s>"):
+                    self.finish_cb(self.client_id)
+                    self.in_progress = False
+                self.buffer = []
+                self.string = ""
+                # print(f"The string is: ::>{self.string}<::")
+                return buf
+            case _:
+                new_str: str = self.tokenizer.convert_ids_to_tokens(token)
+                if not isinstance(new_str, str):
+                    new_str = new_str.decode("utf-8", errors="ignore")
+                if new_str.startswith("▁"):
+                    new_str = " " + new_str[1:]
+                self.string += new_str
+                return None
+
+
 class FunctionaryParser(BaseParser):
     CONTENT = 32000
     RECIPIENT = 32001

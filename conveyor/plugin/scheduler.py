@@ -1,4 +1,3 @@
-from tkinter import S
 from typing import Dict, List, Optional
 
 import multiprocessing as mp
@@ -8,6 +7,7 @@ import time
 from multiprocessing.connection import Connection
 
 from conveyor.plugin.base_plugin import BasePlugin, PlaceholderPlugin
+from conveyor.plugin.planning_plugin import PlanningPlugin
 from conveyor.plugin.python_plugin import PythonPlugin
 from conveyor.plugin.search_plugin import SearchPlugin
 
@@ -59,6 +59,9 @@ class PluginScheduler:
             case "search":
                 plugin = SearchPlugin(self.lazy)
                 logging.debug(f"[PluginScheduler:{client_id}] Starting search plugin")
+            case "planning":
+                plugin = PlanningPlugin(self.lazy)
+                logging.debug(f"[PluginScheduler:{client_id}] Starting planning plugin")
             case _:
                 plugin = PlaceholderPlugin()
                 logging.warn(
