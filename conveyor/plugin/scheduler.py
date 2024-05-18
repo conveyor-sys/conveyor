@@ -7,10 +7,12 @@ import time
 from multiprocessing.connection import Connection
 
 from conveyor.plugin.base_plugin import BasePlugin, PlaceholderPlugin
+from conveyor.plugin.calculator_plugin import CalculatorPlugin
 from conveyor.plugin.news_plugin import LocalNewsPlugin
 from conveyor.plugin.planning_plugin import PlanningPlugin
 from conveyor.plugin.python_plugin import PythonPlugin
 from conveyor.plugin.search_plugin import SearchPlugin
+from conveyor.plugin.sqlite_plugin import SqlitePlugin
 
 from conveyor.utils import getLogger
 
@@ -22,6 +24,7 @@ finish_str = "@[finish]"
 
 def plugin_loop(plugin: BasePlugin, ep: Connection):
     print("Starting plugin loop", file=sys.stderr)
+    plugin.post_init()
     while True:
         data = ep.recv()
         if data == finish_str:
@@ -68,7 +71,14 @@ class PluginScheduler:
                 logging.debug(
                     f"[PluginScheduler:{client_id}] Starting local news plugin"
                 )
-
+            case "query_database":
+                plugin = SqlitePlugin(self.lazy)
+                logging.debug(f"[PluginScheduler:{client_id}] Starting sqlite plugin")
+            case "calculator":
+                plugin = CalculatorPlugin(self.lazy)
+                logging.debug(
+                    f"[PluginScheduler:{client_id}] Starting calculator plugin"
+                )
             case _:
                 plugin = PlaceholderPlugin()
                 logging.warn(

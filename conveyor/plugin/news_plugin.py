@@ -32,5 +32,5 @@ class LocalNewsPlugin(BasePlugin):
                 self.abort = True
                 end_time = datetime.datetime.now()
                 dur = (end_time - self.start_time).total_seconds()
-                print(f"Plugin syntax error detected: {dur}s")
+                print(f"Result: {dur}")
                 self.answer = dur
