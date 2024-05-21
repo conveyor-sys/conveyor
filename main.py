@@ -135,7 +135,7 @@ def eval_search(lazy: bool) -> float:
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end-time_start} s")
         ret_val = time_end - time_start
@@ -173,7 +173,7 @@ def eval_python(req: str, lazy: bool) -> float:
         time_end = time.perf_counter()
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end - time_start} s")
         ret_val = time_end - time_start
@@ -218,7 +218,7 @@ $4 = format_ratio($3)
         time_end = time.perf_counter()
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end - time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end - time_start} s")
         ret_val = time_end - time_start
@@ -313,7 +313,7 @@ def eval_validation(lazy: bool) -> float:
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end-time_start} s")
         ret_val = time_end - time_start
@@ -396,7 +396,7 @@ def eval_sqlite(lazy: bool) -> float:
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end-time_start} s")
         ret_val = time_end - time_start
@@ -479,7 +479,7 @@ def eval_calculator(lazy: bool) -> float:
         logging.info(f"Plugin result: {res}")
         logging.info(f"Finished: {finished[0].decode()}")
         logging.info(
-            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s"
+            f"Speed: {(len(finished[0].tokens)-init_tokens_len)/(time_end-time_start)} tokens/s with {i} iterations"
         )
         logging.info(f"Time: {time_end-time_start} s")
         ret_val = time_end - time_start

@@ -28,7 +28,13 @@ def plugin_loop(plugin: BasePlugin, ep: Connection):
     while True:
         data = ep.recv()
         if data == finish_str:
+            start = time.perf_counter()
             ep.send(plugin.finish())
+            end = time.perf_counter()
+            print(
+                f"!!!!!!!!!!! Plugin finished in {end-start:.4f} seconds",
+                file=sys.stderr,
+            )
             return
         err = plugin.process_new_dat(data)
         if err is not None:
