@@ -21,7 +21,7 @@ def generate_output(which: str, lazy: bool):
 
 
 def multi_run(
-    which: str, lazy: bool, round: int = 3, interval: float = None
+    which: str, lazy: bool, round: int = 5, interval: float = None
 ) -> Tuple[float, float]:
     results = []
     for _ in range(round):
@@ -33,18 +33,18 @@ def multi_run(
 
 if __name__ == "__main__":
     print("Type, Avg, Std")
-    # python_no_lazy = multi_run("python", False)
-    # print(f"Python (w/ partial), {python_no_lazy[0]}, {python_no_lazy[1]}")
-    # python_lazy = multi_run("python", True)
-    # print(f"Python (w/o partial), {python_lazy[0]}, {python_lazy[1]}")
-    # search_no_lazy = multi_run("search", False, interval=10)
-    # print(f"Search (w/ partial), {search_no_lazy[0]}, {search_no_lazy[1]}")
-    # search_lazy = multi_run("search", True, interval=10)
-    # print(f"Search (w/o partial), {search_lazy[0]}, {search_lazy[1]}")
-    # planning_no_lazy = multi_run("planning", False, interval=10)
-    # print(f"Planning (w/ partial), {planning_no_lazy[0]}, {planning_no_lazy[1]}")
-    # planning_lazy = multi_run("planning", True, interval=10)
-    # print(f"Planning (w/o partial), {planning_lazy[0]}, {planning_lazy[1]}")
+    python_no_lazy = multi_run("python", False)
+    print(f"Python (w/ partial), {python_no_lazy[0]}, {python_no_lazy[1]}")
+    python_lazy = multi_run("python", True)
+    print(f"Python (w/o partial), {python_lazy[0]}, {python_lazy[1]}")
+    search_no_lazy = multi_run("search", False, interval=10)
+    print(f"Search (w/ partial), {search_no_lazy[0]}, {search_no_lazy[1]}")
+    search_lazy = multi_run("search", True, interval=10)
+    print(f"Search (w/o partial), {search_lazy[0]}, {search_lazy[1]}")
+    planning_no_lazy = multi_run("planning", False, interval=10)
+    print(f"Planning (w/ partial), {planning_no_lazy[0]}, {planning_no_lazy[1]}")
+    planning_lazy = multi_run("planning", True, interval=10)
+    print(f"Planning (w/o partial), {planning_lazy[0]}, {planning_lazy[1]}")
     validation_no_lazy = multi_run("validation", False)
     print(f"Validation (w/ partial), {validation_no_lazy[0]}, {validation_no_lazy[1]}")
     validation_lazy = multi_run("validation", True)
