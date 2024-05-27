@@ -14,10 +14,24 @@ def generate_output(which: str, lazy: bool):
     output = sp.run(args, stdout=sp.PIPE, stderr=sp.PIPE).stderr
     sys.stdout = old_stdout
     # find line starting with "Result: "
-    for line in output.decode().split("\n"):
+    res = []
+    texts = output.decode().split("\n")
+    for line in texts:
         if line.startswith("Result: "):
-            return line[8:]
-    return output.decode()
+            res.append(line[8:])
+            break
+    if not res:
+        raise ValueError("No output found")
+    plugin_time = []
+    for line in texts:
+        if line.startswith("<PLUGIN_INFO>"):
+            plugin_time.append(float(line.split(" ")[-1]))
+    res.append(plugin_time)
+    for line in texts:
+        if line.startswith("<DECODE_INFO>"):
+            res.append(float(line.split(" ")[-1]))
+            break
+    return res
 
 
 def multi_run(
@@ -25,13 +39,13 @@ def multi_run(
 ) -> Tuple[float, float]:
     results = []
     for _ in range(round):
-        results.append(float(generate_output(which, lazy)))
+        results.append(float(generate_output(which, lazy)[0]))
         if interval:
             time.sleep(interval)
     return np.mean(results), np.std(results)
 
 
-if __name__ == "__main__":
+def run_all():
     print("Type, Avg, Std")
     python_no_lazy = multi_run("python", False)
     print(f"Python (w/ partial), {python_no_lazy[0]}, {python_no_lazy[1]}")
@@ -57,3 +71,30 @@ if __name__ == "__main__":
     print(f"Calculator (w/ partial), {calculator_no_lazy[0]}, {calculator_no_lazy[1]}")
     calculator_lazy = multi_run("calculator", True)
     print(f"Calculator (w/o partial), {calculator_lazy[0]}, {calculator_lazy[1]}")
+
+
+def run_breakdown(which: str, lazy: bool, round: int, interval: float = None):
+    for _ in range(round):
+        results = generate_output(which, lazy)
+        print(
+            f"{which}, {'w/' if not lazy else 'w/o'} partial, {results[0]}, {results[2]}, {results[1]}", flush=True
+        )
+        if interval:
+            time.sleep(interval)
+
+
+if __name__ == "__main__":
+    # run_all()
+    # for i in range(100):
+    #     run_breakdown("search", True, 1)
+    #     run_breakdown("search", False, 1)
+    #     print(f"Finished {i}th round", file=sys.stderr)
+    # for i in range(100):
+    #     run_breakdown("planning", True, 1)
+    #     run_breakdown("planning", False, 1)
+    #     print(f"Finished {i}th round", file=sys.stderr)
+    for i in range(100):
+        run_breakdown("python", False, 1)
+        run_breakdown("sqlite", False, 1)
+        run_breakdown("calculator", False, 1)
+        print(f"Finished {i}th round", file=sys.stderr)

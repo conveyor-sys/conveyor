@@ -27,6 +27,7 @@ class PythonPlugin(BasePlugin):
         self.text_buffer = []
         self.start_time = None
         self.lazy = lazy
+        self.time = 0
         sys.stdout = self.new_stdout
 
     def process_new_dat(self, data: str):
@@ -38,6 +39,7 @@ class PythonPlugin(BasePlugin):
             print("PythonPlugin: Finished python code", file=sys.stderr)
             return None
         try:
+            start = time.perf_counter()
             if not self.lazy and len(self.text_buffer) > 0:
                 if count_prefix_spaces(data) <= count_prefix_spaces(
                     self.text_buffer[0]
@@ -46,11 +48,14 @@ class PythonPlugin(BasePlugin):
                     exec(code, self.global_vars)
                     self.text_buffer = []
             self.text_buffer.append(data)
+            end = time.perf_counter()
+            self.time += end - start
             return None
         except Exception as e:
             return e
 
     def finish(self):
+        start = time.perf_counter()
         if len(self.text_buffer) > 0:
             start_time = time.perf_counter()
             try:
@@ -59,6 +64,9 @@ class PythonPlugin(BasePlugin):
                 return e
             end_time = time.perf_counter()
             logging.info(f"PythonPlugin: Lazy Execution time: {end_time-start_time}")
+        end = time.perf_counter()
+        self.time += end - start
+        print(f"<PLUGIN_INFO> {self.time}", file=sys.stderr)
         val = self.new_stdout.getvalue()
         sys.stdout = self.old_stdout
         return val

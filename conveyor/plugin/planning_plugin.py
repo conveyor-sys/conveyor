@@ -1,3 +1,6 @@
+import sys
+import time
+from turtle import st
 from conveyor.plugin.base_plugin import BasePlugin
 from conveyor.plugin.search_plugin import search
 from conveyor.utils import getLogger
@@ -14,6 +17,7 @@ class PlanningPlugin(BasePlugin):
         self.lazy = lazy
         self.data = {}
         self.buffer = []
+        self.time = 0
         if not self.lazy and self.session is None:
             self.session = requests.Session()
             self.session.get("https://www.google.com/generate_204")
@@ -21,7 +25,10 @@ class PlanningPlugin(BasePlugin):
     def process_new_dat(self, data: str):
         try:
             if not self.lazy:
+                start = time.perf_counter()
                 self.process_line(data)
+                end = time.perf_counter()
+                self.time += end - start
             else:
                 self.buffer.append(data)
             return None
@@ -30,10 +37,15 @@ class PlanningPlugin(BasePlugin):
 
     def finish(self):
         if not self.lazy:
+            print(f"<PLUGIN_INFO> {self.time}", file=sys.stderr)
             return self.data["4"]
         else:
+            start = time.perf_counter()
             for line in self.buffer:
                 self.process_line(line)
+            end = time.perf_counter()
+            self.time += end - start
+            print(f"<PLUGIN_INFO> {self.time}", file=sys.stderr)
             return self.data
 
     def process_line(self, line: str):

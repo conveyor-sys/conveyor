@@ -1,3 +1,4 @@
+import sys
 from typing import List
 from conveyor.plugin.base_plugin import BasePlugin
 from conveyor.utils import getLogger
@@ -16,6 +17,7 @@ class SearchPlugin(BasePlugin):
         self.query = None
         self.session = None
         self.lazy = lazy
+        self.time = 0
 
     def process_new_dat(self, data: dict):
         if not self.lazy and self.session is None:
@@ -38,6 +40,8 @@ class SearchPlugin(BasePlugin):
             start = time.perf_counter()
             result = search(self.session, self.query, "en", "us")
             end = time.perf_counter()
+            self.time = end - start
+            print(f"<PLUGIN_INFO> {end - start}", file=sys.stderr)
             logging.info(f"SearchPlugin: taking {end - start} seconds")
             return result
 

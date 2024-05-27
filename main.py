@@ -80,8 +80,7 @@ def eval_search(lazy: bool) -> float:
                 {
                     "role": "user",
                     # "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
-                    # "content": "Show me how to write hello world in python, c++ and java respectively with google tool, and only use result from stackoverflow.com",
-                    "content": "Show me how to write hello world in python and c++ respectively with google tool, and only use result from stackoverflow.com",
+                    "content": "Show me how to write hello world in python and c++ and java respectively with google tool, and only use result from stackoverflow.com",
                 }
             ],
             tools=tools,
@@ -99,7 +98,7 @@ def eval_search(lazy: bool) -> float:
         if finished:
             break
         i += 1
-    logging.info("Finished: 500 iteration")
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if finished:
         res = None
@@ -161,6 +160,7 @@ def eval_python(req: str, lazy: bool) -> float:
         if finished:
             break
         i += 1
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if plugin_scheduler.lazy:
         plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
@@ -206,6 +206,7 @@ $4 = format_ratio($3)
         if finished:
             break
         i += 1
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if plugin_scheduler.lazy:
         plugin_scheduler.flush_lazy(list(plugin_scheduler.lazy_queue.keys())[0])
@@ -293,6 +294,7 @@ def eval_validation(lazy: bool) -> float:
         if finished:
             break
         i += 1
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if finished:
         if not plugin_scheduler.lazy:
@@ -375,6 +377,7 @@ def eval_sqlite(lazy: bool) -> float:
         if finished:
             break
         i += 1
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if finished:
         res = None
@@ -458,6 +461,7 @@ def eval_calculator(lazy: bool) -> float:
         if finished:
             break
         i += 1
+    print(f"<DECODE_INFO> {time.perf_counter() - time_start}", file=sys.stderr)
 
     if finished:
         res = None
