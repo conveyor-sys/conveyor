@@ -9,7 +9,13 @@ from conveyor.scheduling.scheduler import ScheduleEngine
 import time
 import sys
 from misc.functionary import generate_functionary_input
-from _private.access_token import set_hf_token
+
+try:
+    from _private.access_token import set_hf_token
+except ImportError:
+
+    def set_hf_token():
+        pass
 
 
 from conveyor.utils import clear_other_logger, getLogger
