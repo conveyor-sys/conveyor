@@ -1,6 +1,13 @@
 # Conveyor
+<p align="center">
+<img src="https://img.shields.io/badge/python-3.11-green"/>
+<img src="https://img.shields.io/badge/pytorch-2.1-green"/>
+<img src="https://img.shields.io/badge/license-apache_2.0-blue"/>
+</p>
+---
 
-Conveyor is a LLM-serving runtime with efficient tool usage capability.
+Conveyor is a LLM-serving runtime with efficient tool usage capability. 
+Developers can simply create their toolswith a few lines of code to enable partial execution for tools.
 
 ## Getting Started
 
@@ -15,6 +22,9 @@ pip install flashinfer -i https://flashinfer.ai/whl/cu121/
 ### Run Examples
 
 Use `task.py` to run pre-defined examples.
+
+### Create Your Own Tools
+Simply inherit `BasePlugin` in `conveyor/plugin/base_plugin.py` and implement corresponding methods. Examples can be found under the same directory.
 
 ## License 
 
