@@ -1,4 +1,3 @@
-import os
 import sys
 import subprocess as sp
 import time
@@ -77,23 +76,26 @@ def run_breakdown(which: str, lazy: bool, round: int, interval: float = None):
     for _ in range(round):
         results = generate_output(which, lazy)
         print(
-            f"{which}, {'w/' if not lazy else 'w/o'} partial, {results[0]}, {results[2]}, {results[1]}", flush=True
+            f"{which}, {'w/' if not lazy else 'w/o'} partial, {results[0]}, {results[2]}, {results[1]}",
+            flush=True,
         )
         if interval:
             time.sleep(interval)
 
 
 if __name__ == "__main__":
-    # run_all()
-    # for i in range(100):
-    #     run_breakdown("search", True, 1)
-    #     run_breakdown("search", False, 1)
-    #     print(f"Finished {i}th round", file=sys.stderr)
-    # for i in range(100):
-    #     run_breakdown("planning", True, 1)
-    #     run_breakdown("planning", False, 1)
-    #     print(f"Finished {i}th round", file=sys.stderr)
     for i in range(100):
+        run_breakdown("search", True, 1)
+        run_breakdown("search", False, 1)
+        print(f"Finished {i}th round", file=sys.stderr)
+    for i in range(100):
+        run_breakdown("planning", True, 1)
+        run_breakdown("planning", False, 1)
+        print(f"Finished {i}th round", file=sys.stderr)
+    for i in range(100):
+        run_breakdown("python", True, 1)
+        run_breakdown("sqlite", True, 1)
+        run_breakdown("calculator", True, 1)
         run_breakdown("python", False, 1)
         run_breakdown("sqlite", False, 1)
         run_breakdown("calculator", False, 1)

@@ -79,7 +79,6 @@ def eval_search(lazy: bool) -> float:
             messages=[
                 {
                     "role": "user",
-                    # "content": "Show me the latitude and altitude of the Eiffel Tower, White House, Tokyo Tree, and the Great Wall of China respectively",
                     "content": "Show me how to write hello world in python and c++ and java respectively with google tool, and only use result from stackoverflow.com",
                 }
             ],
@@ -102,20 +101,6 @@ def eval_search(lazy: bool) -> float:
 
     if finished:
         res = None
-        # if plugin_scheduler.lazy:
-        #     cur_id = list(plugin_scheduler.lazy_queue.keys())[0]
-        #     while (
-        #         cur_id in plugin_scheduler.lazy_queue
-        #         and len(plugin_scheduler.lazy_queue[cur_id]) > 0
-        #     ):
-        #         plugin_scheduler.flush_lazy_sequentially(cur_id)
-        #         while len(plugin_scheduler.waiting_queue) > 0:
-        #             res = plugin_scheduler.poll_finished(cur_id)
-        # else:
-        #     while len(plugin_scheduler.waiting_queue) > 0:
-        #         res = plugin_scheduler.poll_finished(
-        #             list(plugin_scheduler.waiting_queue.keys())[0]
-        #         )
         if not plugin_scheduler.lazy:
             while len(plugin_scheduler.waiting_queue) > 0:
                 res = plugin_scheduler.poll_finished(
@@ -495,13 +480,11 @@ def eval_calculator(lazy: bool) -> float:
 
 
 def eval_scheduling():
-    # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
     model_name = "meetkai/functionary-small-v2.2"
     logging.info(f"Loading model {model_name}")
     plugin_scheduler = PluginScheduler()
     engine = ScheduleEngine(
         ModelConfig(model_name),
-        # PlaceHolderParser,
         FunctionaryParser,
         plugin_scheduler,
         max_concurrent_requests=1,
@@ -600,7 +583,9 @@ def eval_python_wrapper(lazy: bool) -> float:
 
 if __name__ == "__main__":
     if len(sys.argv) <= 1:
-        print("Usage: python main.py [python|scheduling|search] [lazy?]")
+        print(
+            "Usage: python main.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
+        )
         sys.exit(1)
     if len(sys.argv) == 3 and sys.argv[2] == "lazy":
         lazy = True
@@ -623,6 +608,8 @@ if __name__ == "__main__":
         case "calculator":
             result = eval_calculator(lazy)
         case _:
-            print("Usage: python main.py [python|scheduling|search] [lazy?]")
+            print(
+                "Usage: python main.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
+            )
             sys.exit(1)
     print(f"Result: {result}", file=sys.stderr)
