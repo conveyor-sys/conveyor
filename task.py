@@ -584,7 +584,7 @@ def eval_python_wrapper(lazy: bool) -> float:
 if __name__ == "__main__":
     if len(sys.argv) <= 1:
         print(
-            "Usage: python main.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
+            "Usage: python task.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
         )
         sys.exit(1)
     if len(sys.argv) == 3 and sys.argv[2] == "lazy":
@@ -609,7 +609,7 @@ if __name__ == "__main__":
             result = eval_calculator(lazy)
         case _:
             print(
-                "Usage: python main.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
+                "Usage: python task.py [python|scheduling|search|planning|validation|sqlite] [lazy?]"
             )
             sys.exit(1)
     print(f"Result: {result}", file=sys.stderr)

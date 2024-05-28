@@ -6,7 +6,7 @@ import numpy as np
 
 
 def generate_output(which: str, lazy: bool):
-    args = ["python3", "main.py", which]
+    args = ["python3", "task.py", which]
     if lazy:
         args.append("lazy")
     old_stdout = sys.stdout
