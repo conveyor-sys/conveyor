@@ -32,4 +32,3 @@ class CalculatorPlugin(BasePlugin):
         self.answer = eval(query)
         end = time.perf_counter()
         self.time += end - start
-

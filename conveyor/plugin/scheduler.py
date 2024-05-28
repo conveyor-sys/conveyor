@@ -136,7 +136,6 @@ class PluginScheduler:
         for plugin in plugin_list:
             if plugin.local_pipe.poll():
                 res = plugin.local_pipe.recv()
-                # logging.debug(f"[PluginScheduler:{client_id}] Finished: {res}")
                 self.join_queue.append(plugin.process)
                 logging.debug(f"[PluginScheduler:{client_id}] Process joined")
                 plugin_list.remove(plugin)

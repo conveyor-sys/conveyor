@@ -280,7 +280,6 @@ class ScheduleEngine:
         self.roundrobin_policy()
         # self.fcfs_policy()
         next_operation = self.schedule_next_operation()
-        # logging.debug(f"Scheduler: next operation={next_operation}")
         match next_operation:
             case InferenceState.APPEND:
                 logits, _ = self.forward_append(self.context)
@@ -321,7 +320,6 @@ class ScheduleEngine:
         page_needed, page_idx_start = compute_page_needed(
             sched_ctx.seq_lens, sched_ctx.completed_lens, cache_manager.page_size
         )
-        # logging.debug(f"page_needed={page_needed}, page_idx_start={page_idx_start}")
 
         page_num_required = int(page_needed.sum().item())
         if page_num_required > 0:
@@ -332,9 +330,6 @@ class ScheduleEngine:
                 (page_needed.size(0) + 1,), dtype=torch.int64, device="cpu"
             )
             range_idx[1:] = page_needed.cumsum(dim=0)
-            # logging.debug(
-            #     f"Allocated pages: new_page_idx={new_page_idx}, range_idx={range_idx}"
-            # )
             for i in range(page_needed.size(0)):
                 cache_manager.req_page_mapping[
                     req_ids[i],
@@ -391,7 +386,6 @@ class ScheduleEngine:
         req_ids = torch.tensor(
             [req.req_id for req in sched_ctx.requests], dtype=torch.int64, device="cuda"
         )
-        # sched_ctx.seq_lens.add_(1)
 
         ScheduleEngine.prepare_kv_page(req_ids, sched_ctx, self.cache_manager)
 
@@ -468,7 +462,6 @@ class ScheduleEngine:
 
     def fcfs_policy(self) -> None:
         while self.new_request_available():
-            # TODO: more than one request can be added
             new_request = self.request_pool.pop_request()
             logging.info(f"Scheduler: new request={new_request.req_id}")
             self.context.add_active_request(new_request)

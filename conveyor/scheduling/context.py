@@ -14,7 +14,7 @@ from flashinfer import (
 from conveyor.models.config import ModelConfig
 
 from conveyor.scheduling.cache_manager import CacheManager
-from conveyor.scheduling.parsing import BaseParser, FunctionaryParser
+from conveyor.scheduling.parsing import BaseParser
 from conveyor.utils import getLogger
 
 logging = getLogger(__name__)
@@ -102,9 +102,6 @@ class InferenceContext:
                     config.head_dim,
                     1,
                 )
-        # logging.debug(
-        #     f"InferenceContext::new(): state={state}, req_ids={req_ids}, seq_lens={seq_lens}, filling_start_offset={filling_start_offset}, kv_indptr={kv_indptr}, kv_page_index={kv_page_index}, kv_last_page_lens={kv_last_page_lens}, qo_indptr={qo_indptr}"
-        # )
 
         return cls(
             state=state,
@@ -147,10 +144,7 @@ class RequestInfo:
         self.parser = parser
 
     def evaluate_parser(self, token: int):
-        tokens = self.parser.enqueue(token)
-        # if tokens is not None:
-        #     print(f"::: Evaluate Raw: !!@ {tokens} @!!")
-        #     print(f"::: Evaluate Decoded: !!@ {self.tokenizer.decode(tokens)} @!!")
+        self.parser.enqueue(token)
 
     def decode(self) -> str:
         return self.tokenizer.decode(self.tokens)

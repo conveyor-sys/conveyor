@@ -57,7 +57,6 @@ class PythonParser(BaseParser):
                     self.in_progress = False
                 self.buffer = []
                 self.string = ""
-                # print(f"The string is: ::>{self.string}<::")
                 return buf
             case _:
                 new_str: str = self.tokenizer.convert_ids_to_tokens(token)
@@ -99,7 +98,6 @@ class PlanningParser(BaseParser):
                     self.in_progress = False
                 self.buffer = []
                 self.string = ""
-                # print(f"The string is: ::>{self.string}<::")
                 return buf
             case _:
                 new_str: str = self.tokenizer.convert_ids_to_tokens(token)
@@ -121,7 +119,6 @@ class FunctionaryParser(BaseParser):
     def __init__(self, tokenizer, client_id, start_cb, update_cb, finish_cb):
         self.buffer = []
         self.string = ""
-        # self.left_bracket_pos = []
         self.tokenizer = tokenizer
         self.start_cb = start_cb
         self.update_cb = update_cb
