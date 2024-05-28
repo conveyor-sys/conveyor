@@ -20,7 +20,7 @@ class SqlitePlugin(BasePlugin):
     def post_init(self):
         start = time.perf_counter()
         if not self.lazy:
-            self.connection = sqlite3.connect("_private/test.sqlite3")
+            self.connection = sqlite3.connect("test/test.sqlite3")
             self.cursor = self.connection.cursor()
         end = time.perf_counter()
         self.time += end - start
@@ -41,7 +41,7 @@ class SqlitePlugin(BasePlugin):
     def compute(self, data: dict):
         start = time.perf_counter()
         if self.connection is None:
-            self.connection = sqlite3.connect("_private/test.sqlite3")
+            self.connection = sqlite3.connect("test/test.sqlite3")
             self.cursor = self.connection.cursor()
         if data.get("query") is not None:
             self.cursor.execute("SELECT * FROM employees ORDER BY name")
